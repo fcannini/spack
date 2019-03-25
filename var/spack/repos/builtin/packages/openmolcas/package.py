@@ -57,7 +57,7 @@ class Openmolcas(CMakePackage):
         See https://gitlab.com/Molcas/OpenMolcas/issues/2 and
         https://gitlab.com/Molcas/OpenMolcas/issues/70
         """
-        run_env.prepend_path('PATH', self.prefix.bin)
+        spack_env.prepend_path('PATH', self.prefix.bin)
 
     def cmake_args(self):
         spec = self.spec
@@ -96,6 +96,16 @@ class Openmolcas(CMakePackage):
 
         return args
 
-#   find if and where 'pymolcas' was incorrectly installed and move to the correct directory
-#   @run_after('install')
-#   def fix_pymolcas_location:
+
+    #find if and where 'pymolcas' was incorrectly installed and fix it
+    # Yes, it's ugly as a 3-spaces tabbed C-shell script,
+    # but it'll be needed until I can find a more elegant and permanent fix
+    @run_after('install')
+    def post_install(self):
+        for dir in os.getenv('PATH').split(os.pathsep):
+            pymolcas = os.path.join(dir, 'pymolcas')
+            # if I've found a file
+            if os.path.isfile(pymolcas) is True:
+                # And it's not at the right place
+                if os.path.isfile(self.prefix.bin.join('pymolcas')) is False:
+                    os.rename(pymolcas, self.prefix.bin.join('pymolcas'))
