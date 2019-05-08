@@ -16,7 +16,11 @@ class Namd(MakefilePackage):
     homepage = "http://www.ks.uiuc.edu/Research/namd/"
     url      = "file://{0}/NAMD_2.12_Source.tar.gz".format(os.getcwd())
 
+    version('2.9', sha256='9ba6a1f87d4600a62847728d7c223295be214f9a72b5bb62552f74d644108424')
+    version('2.10', sha256='a5282c172524c2fbe6b9ba56f2de8c84f1093405c914ffbc70442dd0dd4e4289')
+    version('2.11', sha256='4de1a8c95d7ad3dc3b4ce22f261cec85beb8d06b332d016c28e432d9986f0789')
     version('2.12', '2a1191909b1ab03bf0205971ad4d8ee9')
+    version('2.13', sha256='cb0b43f520ac6be761899326441541aa00de15897986223c8ce2f0f6e42b52bc')
 
     variant('fftw', default='3', values=('none', '2', '3', 'mkl'),
             description='Enable the use of FFTW/FFTW3/MKL FFT')
