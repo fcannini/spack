@@ -10,15 +10,12 @@ from spack import *
 
 
 class Namd(MakefilePackage):
-    """NAMDis a parallel molecular dynamics code designed for
+    """NAMD is a parallel molecular dynamics code designed for
     high-performance simulation of large biomolecular systems."""
 
     homepage = "http://www.ks.uiuc.edu/Research/namd/"
     url      = "file://{0}/NAMD_2.12_Source.tar.gz".format(os.getcwd())
 
-    version('2.9', sha256='9ba6a1f87d4600a62847728d7c223295be214f9a72b5bb62552f74d644108424')
-    version('2.10', sha256='a5282c172524c2fbe6b9ba56f2de8c84f1093405c914ffbc70442dd0dd4e4289')
-    version('2.11', sha256='4de1a8c95d7ad3dc3b4ce22f261cec85beb8d06b332d016c28e432d9986f0789')
     version('2.12', '2a1191909b1ab03bf0205971ad4d8ee9')
     version('2.13', sha256='cb0b43f520ac6be761899326441541aa00de15897986223c8ce2f0f6e42b52bc')
 
@@ -26,9 +23,15 @@ class Namd(MakefilePackage):
             description='Enable the use of FFTW/FFTW3/MKL FFT')
 
     variant('interface', default='none', values=('none', 'tcl', 'python'),
-            description='Enables TCL and/or python interface')
+            description='Enables TCL and/or python interface.'
+                        'TCL is a required dependency from 2.13 onwards.')
+
+    variant('cuda', default=False, description='Enables running on NVDIA GPUs')
 
     depends_on('charmpp')
+    # TODO:
+    # Enable choice between single-node (multicore) and multi-node (verbs)
+    depends_on('charmpp ~smp backend=multicore', when='+cuda')
 
     depends_on('fftw@:2.99', when="fftw=2")
     depends_on('fftw@3:', when="fftw=3")
@@ -36,9 +39,17 @@ class Namd(MakefilePackage):
     depends_on('intel-mkl', when="fftw=mkl")
 
     depends_on('tcl', when='interface=tcl')
+    depends_on('tcl', when='@2.13:')
 
     depends_on('tcl', when='interface=python')
     depends_on('python', when='interface=python')
+
+    # Cuda versions from the 'New Features' page and $(spack info cuda)
+    # https://www.ks.uiuc.edu/Research/namd/2.13/features.html
+    depends_on('cuda@8.0.61:9.2.88', when='@2.13: +cuda')
+
+    # I've experienced compiler segfaults when gcc version is > 7.x
+    conflicts('%gcc@8:')
 
     def _copy_arch_file(self, lib):
         config_filename = 'arch/{0}.{1}'.format(self.arch, lib)
@@ -85,7 +96,9 @@ class Namd(MakefilePackage):
 
                 fh.write('\n'.join([
                     'NAMD_ARCH = {0}'.format(self.arch),
-                    'CHARMARCH = ',
+                    'CHARMARCH = {0}'.format(
+                        spec['charmpp'].variants['backend'].value +
+                        '-' + self.arch),
                     'CXX = {0.cxx} {0.cxx11_flag}'.format(
                         self.compiler),
                     'CXXOPTS = {0}'.format(optim_opts),
@@ -97,6 +110,7 @@ class Namd(MakefilePackage):
         self._copy_arch_file('base')
 
         opts = ['--charm-base', spec['charmpp'].prefix]
+
         fftw_version = spec.variants['fftw'].value
         if fftw_version == 'none':
             opts.append('--without-fftw')
@@ -110,16 +124,34 @@ class Namd(MakefilePackage):
                          '--fftw-prefix', spec['fftw'].prefix])
 
         interface_type = spec.variants['interface'].value
-        if interface_type != 'none':
+
+        # See variant('interface'), depends('tcl')
+        if interface_type != 'none' or '@2.13:' in spec:
             self._append_option(opts, 'tcl')
 
             if interface_type == 'python':
                 self._append_option(opts, 'python')
+
         else:
             opts.extend([
                 '--without-tcl',
                 '--without-python'
             ])
+
+        # Must remove '$(CHARMARCH)' from the string
+        # so that it finds 'spec['charmpp'].prefix' correctly
+        filter_file(r'\$\(CHARMBASE\)/\$\(CHARMARCH\)',
+                    r'$(CHARMBASE)',
+                    'config'
+                    )
+
+        if '+cuda' in spec:
+            self._append_option(opts, 'cuda')
+            filter_file('^CUDADIR=.*$',
+                        'CUDADIR={0}'.format(
+                            spec['cuda'].prefix,
+                            self.arch + '.cuda')
+                        )
 
         config = Executable('./config')
 
