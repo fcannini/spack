@@ -59,6 +59,9 @@ class Lammps(CMakePackage):
     variant('mpi', default=True,
             description='Build with mpi')
 
+    variant('cuda', default=False,
+            description='Build LAMMPS with cuda support')
+
     depends_on('mpi', when='+mpi')
     depends_on('mpi', when='+mpiio')
     depends_on('fftw', when='+kspace')
@@ -75,6 +78,7 @@ class Lammps(CMakePackage):
     depends_on('mpi', when='+user-lb')
     depends_on('mpi', when='+user-h5md')
     depends_on('hdf5', when='+user-h5md')
+    depends_on('cuda', when='+cuda')
 
     conflicts('+body', when='+poems@:20180628')
     conflicts('+latte', when='@:20170921')
@@ -118,5 +122,11 @@ class Lammps(CMakePackage):
                 args.append('{0}=OFF'.format(opt))
         if '+kspace' in spec:
             args.append('-DFFT=FFTW3')
+
+        if '+cuda' in spec:
+            args.append('-D{0}_GPU={1}'.format(pkg_prefix, 'ON'))
+            args.append('-DGPU_API=cuda')
+        else:
+            args.append('-D{0}_GPU={1}'.format(pkg_prefix, 'OFF'))
 
         return args
