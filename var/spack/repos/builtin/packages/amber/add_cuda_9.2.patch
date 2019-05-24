@@ -1,0 +1,11 @@
+--- a/cmake/CudaConfig.cmake    2019-05-23 20:19:56.394031514 -0400
++++ b/cmake/CudaConfig.cmake	2019-05-23 20:10:32.170975556 -0400
+@@ -59,7 +59,7 @@
+ 			message(STATUS "BE AWARE: CUDA 8.0 does not support V100, Volta Gefore / GTX Ampere? or other Volta based GPUs.")
+ 		  	list(APPEND CUDA_NVCC_FLAGS ${SM30FLAGS} ${SM50FLAGS} ${SM52FLAGS} ${SM53FLAGS} ${SM60FLAGS} ${SM61FLAGS} -Wno-deprecated-gpu-targets)
+ 		  	
+-		elseif((${CUDA_VERSION} VERSION_EQUAL 9.0) OR (${CUDA_VERSION} VERSION_EQUAL 9.1))
++		elseif((${CUDA_VERSION} VERSION_EQUAL 9.0) OR (${CUDA_VERSION} VERSION_EQUAL 9.2))
+ 		
+ 			if(VOLTA)
+ 				message(STATUS "Configuring for SM7.0 only with special optimizations")
