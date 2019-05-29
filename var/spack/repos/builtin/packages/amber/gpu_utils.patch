@@ -1,0 +1,14 @@
+--- a/amber18/src/CMakeLists.txt	2019-05-23 14:21:45.117480659 -0400
++++ b/amber18/src/CMakeLists.txt	2019-05-23 14:22:13.686214709 -0400
+@@ -1,8 +1,8 @@
+ #tree CMake file for AMBER
+ 
+-if(CUDA)
+-	add_subdirectory(gpu_utils)
+-endif()
++#if(CUDA)
++#	add_subdirectory(gpu_utils)
++#endif()
+ 
+ #disabled, not currently compiling
+ #add_subdirectory(dcqtp)

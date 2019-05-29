@@ -39,6 +39,7 @@ class ParallelNetcdf(AutotoolsPackage):
     variant('fortran', default=True, description='Build the Fortran Interface')
     variant('pic', default=True,
             description='Produce position-independent code (for shared libs)')
+    variant('shared', default=True, description='Produces shared libraries')
 
     depends_on('mpi')
 
@@ -69,6 +70,10 @@ class ParallelNetcdf(AutotoolsPackage):
         if '~fortran' in spec:
             args.append('--disable-fortran')
 
+        args.append('--enable-shared={0}'.format(
+            'no' if '~shared' in spec else 'yes')
+        )
+        
         return args
 
     def install(self, spec, prefix):
