@@ -6,20 +6,18 @@
 from spack import *
 import os
 
-#import distutils.dir_util
 
 class Amber(CMakePackage):
     """Amber is a suite of biomolecular simulation programs."""
 
-    homepage = "http://ambermd.org"
-    url      = "file://{0}/linux-AmberTools18.tar.bz2".format(os.getcwd())
+    homepage = 'http://ambermd.org'
+    url      = 'file://{0}/linux-AmberTools18.tar.bz2'.format(os.getcwd())
 
     version('18', sha256='c630fc3d251fcefe19bb81c8c617e0547f1687b6aef68ea526e4e5fff65bea1c')
 
-    resource(
-            name='amber-source',
+    resource(name='amber-source',
             sha256='2060897c0b11576082d523fb63a51ba701bc7519ff7be3d299d5ec56e8e6e277',
-            url="file://{0}/linux-Amber18.tar.bz2".format(os.getcwd()),
+            url='file://{0}/linux-Amber18.tar.bz2'.format(os.getcwd())
     )
 
     # url for amber update patches. As of may/2019 there 14 patches released:
@@ -41,48 +39,62 @@ class Amber(CMakePackage):
     variant('tools', default=True,
             description='Builds AmberTools also. Enabled by default.'
                         'Disabling speeds up installation'
-                        'if you only need the main programs.'
-            )
+                        'if you only need the main programs.')
 
     depends_on('cmake', type='build')
     depends_on('flex', type='build')
-#    depends_on('byacc', type='build')
     depends_on('m4', type='build')
     depends_on('automake', type='build')
+    depends_on('autoconf', type='build')
     depends_on('bzip2')
     depends_on('readline')
     depends_on('ncurses')
-    depends_on('python@3: +tkinter')
+    depends_on('perl')
+    depends_on('python@3.4.0:3.6.99 +tkinter')
+    depends_on('py-setuptools')
     depends_on('py-numpy')
     depends_on('py-scipy')
     depends_on('py-matplotlib')
-    depends_on('py-mpi4py')
     depends_on('py-cython')
+    depends_on('py-mpi4py')
     depends_on('blas')
     depends_on('lapack')
     depends_on('mpi')
     depends_on('fftw')
     depends_on('arpack-ng')
+    # TODO:
+    # use external builds of netcdf, netcdf-fortran and parallel-netcdf
+    # depends_on('hdf5 +fortran +hl')
+    # depends_on('netcdf')
+    # depends_on('netcdf-fortran')
+    # depends_on('parallel-netcdf')
     depends_on('boost')
     depends_on('cuda@7.5.18:9.2.999', when='+cuda')
 
     # http://ambermd.org/Installation.php
     conflicts('^openmpi@4:',
-                msg="Caution: As of February, 2019,"
-                    "Amber won't compile with version 4 of openmpi."
-                    "This release removes support from some"
-                    "older MPI calls that we still use."
-                    "We are working on the problem."
-            )
+                msg='Caution: As of February, 2019,'
+                    'Amber won\'t compile with version 4 of openmpi.'
+                    'This release removes support from some'
+                    'older MPI calls that we still use.'
+                    'We are working on the problem.')
 
+    # You might want to get a cup of your favorite beverage,
+    # this will take a while.
+    parallel = False
 
     def setup_dependent_environment(self, spack_env, run_env, dependent_spec):
         # This one is needed to build amber
         spack_env.set('AMBERHOME', self.stage.source_path)
 
-        # This one is needed later in the module file to run amber
+        # These are needed later in the module file to run amber
         run_env.set('AMBERHOME', self.prefix)
 
+        run_env.prepend_path('PERL5LIB', self.prefix.lib.join('perl'))
+
+        run_env.prepend_path('PYTHONPATH', join_path(
+            self.prefix.lib, join('python', spec['python'].version.up_to(2)))
+        )
 
     def cmake_args(self):
         spec = self.spec
@@ -90,13 +102,13 @@ class Amber(CMakePackage):
         _build_dir = self.stage.source_path
         _nameversion = '{0}{1}'.format(self.name, self.version)
         _amber_dir = join_path(_build_dir, _nameversion)
-        _src_dirs = [ 'src', 'test', 'benchmarks']
+        _src_dirs = ['src', 'test', 'benchmarks']
 
         for _d in _src_dirs:
-                _from_here = join_path(_amber_dir, _d)
-                _to_here = join_path(_build_dir, _d)
-                mkdirp(_to_here)
-                copy_tree(_from_here, _to_here)
+            _from_here = join_path(_amber_dir, _d)
+            _to_here = join_path(_build_dir, _d)
+            mkdirp(_to_here)
+            copy_tree(_from_here, _to_here)
 
         # You can in theory run this through cmake. But after updating
         # cmake is run again and then it may be or not under spack control.
@@ -108,23 +120,19 @@ class Amber(CMakePackage):
 
         # This list comes from 'cmake/3rdPartyTools.cmake'
         # and will probably grow as time passes
-        external_libs = ['blas','lapack','fftw','readline','mpi4py',
-                        'zlib','libbz2','libm','boost', 'arpack']
-
-        # This list comes from 'cmake/3rdPartyTools.cmake'
-        # and will probably shrink as time passes
-        disabled_libs = ['lio','apbs','pupil','plumed']
+        external_libs = ['blas', 'lapack', 'fftw', 'readline', 'mpi4py',
+                         'zlib', 'libbz2', 'libm', 'boost', 'arpack']
 
         # This list comes from 'cmake/WhichTools.cmake'
         # and will change as new code is added to amber
         # Do not change the order of elements
-        tools = ['gbnsr6','cifparse','addles','sander','nmr_aux',
-                'nmode','antechamber','sqm','reduce','sebomd',
-                'ndiff-2.00','cpptraj','pbsa','sff','rism','nab','etc',
-                'mdgx','xtalutil','saxs','mm_pbsa','paramfit','FEW',
-                'amberlite','cphstats','quick','nfe-umbrella-slice',
-                'leap','parmed','mmpbsa_py','pymsmt','pysander',
-                'pytraj','pymdgx','pdb4amber','packmol_memgen']
+        tools = ['gbnsr6', 'cifparse', 'addles', 'sander', 'nmr_aux',
+                 'nmode', 'antechamber', 'sqm', 'reduce', 'sebomd',
+                 'ndiff-2.00', 'cpptraj', 'pbsa', 'sff', 'rism', 'nab', 'etc',
+                 'mdgx', 'xtalutil', 'saxs', 'mm_pbsa', 'paramfit', 'FEW',
+                 'amberlite', 'cphstats', 'quick', 'nfe-umbrella-slice',
+                 'leap', 'parmed', 'mmpbsa_py', 'pymsmt', 'pysander',
+                 'pytraj', 'pymdgx', 'pdb4amber', 'packmol_memgen']
 
         args.append('-DCOMPILER=MANUAL')
         args.append('-DDOWNLOAD_MINICONDA=OFF')
@@ -132,19 +140,16 @@ class Amber(CMakePackage):
         args.append('-DBUILD_GUI=OFF')
         args.append('-DCHECK_UPDATES=OFF')
         args.append('-DAPPLY_UPDATES=OFF')
+        args.append('-DBLA_VENDOR=All')
 
         if '~tools' in spec:
             args.append('-DDISABLE_TOOLS={0}'.format(
-            ';'.join(tools))
-        )
+                ';'.join(tools))
+            )
 
         args.append('-DFORCE_EXTERNAL_LIBS={0}'.format(
             ';'.join(external_libs))
         )
-
-#       args.append('-DFORCE_DISABLE_LIBS={0}'.format(
-#           ';'.join(disabled_libs))
-#       )
 
         args.append('-DCUDA={0}'.format(
             'ON' if '+cuda' in spec else 'OFF')
@@ -170,14 +175,34 @@ class Amber(CMakePackage):
                 spec['fftw'].prefix.lib.join('libfftw3_mpi.so'))
             )
 
-        args.append('-DBLA_VENDOR=All')
+        # TODO:
+        # use external builds of netcdf, netcdf-fortran and parallel-netcdf
+        # args.append('-DNetCDF_LIBRARIES={0}'.format(
+        #     spec['netcdf'].prefix.lib.join('libnetcdf.so'))
+        # )
 
-#       args.append('-DBLAS_openblas_LIBRARY={0}'.format(
-#           spec['blas'].prefix.lib.join('libopenblas.so'))
-#       )
+        # args.append('-DNetCDF_INCLUDES={0}'.format(
+        #     spec['netcdf'].prefix.include)
+        # )
 
-#       args.append('-DLAPACK_openblas_LIBRARY={0}'.format(
-#           spec['lapack'].prefix.lib.join('libopenblas.so'))
-#       )
+        # args.append('-DNetCDF_LIBRARIES_F90={0}'.format(
+        #     spec['netcdf-fortran'].prefix.lib.join('libnetcdff.so'))
+        # )
+
+        # args.append('-DPnetCDF_C_LIBRARY={0}'.format(
+        #     spec['parallel-netcdf'].prefix.lib.join('libpnetcdf.so'))
+        # )
+
+        # args.append('-DPnetCDF_C_INCLUDE_DIR={0}'.format(
+        #     spec['parallel-netcdf'].prefix.include)
+        # )
+
+        # args.append('-DPnetCDF_Fortran_LIBRARY={0}'.format(
+        #     spec['parallel-netcdf'].prefix.lib.join('libpnetcdf.so'))
+        # )
+
+        # args.append('-DPnetCDF_Fortran_INCLUDE_DIR={0}'.format(
+        #     spec['parallel-netcdf'].prefix.include)
+        # )
 
         return args
