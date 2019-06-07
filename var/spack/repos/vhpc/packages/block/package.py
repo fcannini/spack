@@ -20,7 +20,7 @@ class Block(MakefilePackage):
 
     version('1.5.3', sha256='0f8f97f3983f7b938d94470732884cd28e08589dd116a2e0b3dc62664a0b91d9') # noqa
 
-    variant('mpi', default=False, description='MPI-enabled build')
+    variant('mpi', default=True, description='MPI-enabled build')
 
     depends_on('blas')
     depends_on('lapack')
