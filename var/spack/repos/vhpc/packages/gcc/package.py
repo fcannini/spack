@@ -222,7 +222,7 @@ class Gcc(AutotoolsPackage):
     # From the dates on the thread and the tentative release date of GCC 8.3,
     # https://gcc.gnu.org/ml/gcc/2019-02/msg00034.html
     # Update 20190520: Fixed in version 9.1.0, lines 4277-4282 of 'gcc/fortran/expr.c'
-    patch('gfortran-noncontiguous-pointers.patch', when='@:8.99.99')
+    patch('gfortran-noncontiguous-pointers.patch', when='@8.0.0:8.99.99')
 
     build_directory = 'spack-build'
 
