@@ -34,16 +34,16 @@ class PyRunipy(PythonPackage):
     patch('fix-setup-readme.patch', when='^python@3.5.0:3.5.99',
             sha256='036b948944ddc9e2533a4935c5a769c35efe28b61b1ec72ecbb3e96da1e3888e')
 
-    depends_on('python@3:')
-    depends_on('py-ipython@2.3.1:')
-    depends_on('py-backcall ^python@3:')
-    depends_on('py-jinja2@2.7.2:')
-    depends_on('py-pygments@1.6:')
+    depends_on('python@3:', type=('run', 'build'))
+    depends_on('py-ipython@2.3.1:', type='run')
+    depends_on('vhpc.py-backcall', type='run')
+    depends_on('py-jinja2@2.7.2:', type='run')
+    depends_on('py-pygments@1.6:', type='run')
     depends_on('py-setuptools', type='build')
     depends_on('py-vcversioner', type='build')
-#    depends_on('py-ipykernel@4.0.0', when='^py-ipython@4.0.0:')
-#    depends_on('py-nbconvert@4.0.0', when='^py-ipython@4.0.0:')
-#    depends_on('py-nbformat@4.0.0', when='^py-ipython@4.0.0:')
+    depends_on('py-ipykernel@4.0.0', when='^py-ipython@4.0.0:')
+    depends_on('py-nbconvert@4.0.0', when='^py-ipython@4.0.0:')
+    depends_on('py-nbformat@4.0.0', when='^py-ipython@4.0.0:')
 
     extends('python@3:')
 
