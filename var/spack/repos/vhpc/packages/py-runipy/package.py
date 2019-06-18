@@ -41,9 +41,9 @@ class PyRunipy(PythonPackage):
     depends_on('py-pygments@1.6:', type='run')
     depends_on('py-setuptools', type='build')
     depends_on('py-vcversioner', type='build')
-    depends_on('py-ipykernel@4.0.0', when='^py-ipython@4.0.0:')
-    depends_on('py-nbconvert@4.0.0', when='^py-ipython@4.0.0:')
-    depends_on('py-nbformat@4.0.0', when='^py-ipython@4.0.0:')
+    depends_on('py-ipykernel@4.0.0:', when='^py-ipython@4.0.0:')
+    depends_on('py-nbconvert@4.0.0:', when='^py-ipython@4.0.0:')
+    depends_on('py-nbformat@4.0.0:', when='^py-ipython@4.0.0:')
 
     extends('python@3:')
 
