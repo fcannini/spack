@@ -22,6 +22,7 @@
 
 from spack import *
 
+
 class Openmm(CMakePackage):
     """
     A high performance toolkit for molecular simulation.
@@ -36,8 +37,9 @@ class Openmm(CMakePackage):
 
     version('7.3.1', sha256='db0c1fddc3068f689931385bc4009529261300a19effc2a9d3d47e43ab752875')
 
-    patch('fix_python_install_location.patch', when='@7.3.1:',
-            sha256='196a4337fb412ef5a7eb1216025561587dc9b16b0f84de463e576fc9e77c2426')
+#    Patch breaks python bindings installation, disable for now.
+#    patch('fix_python_install_location.patch', when='@7.3.1:',
+#            sha256='a3ab285ad946170c9323203df84544028357a5720191df1abcfc967faea43990')
 
 #    variant('python', default=False, description='Builds python bindings')
     variant('cuda', default=False, description='Builds the cuda platform')
@@ -53,17 +55,15 @@ class Openmm(CMakePackage):
     depends_on('cuda', when='+cuda')
     depends_on('cmake@3.1:', type='build')
     depends_on('doxygen', type='build')
-    depends_on('python@3:', type=('build', 'link','run'))
 #    depends_on('python@3:', type=('build', 'link','run'), when='+python')
 #    depends_on('swig@3.0.5:', type='build', when='+python')
     depends_on('swig@3.0.5:', type='build')
 #    depends_on('py-numpy', type='build', when='+python')
-    depends_on('py-numpy', type='build')
+    depends_on('py-numpy', type=('build', 'link'))
 #    depends_on('py-setuptools', type='build', when='+python')
     depends_on('py-setuptools', type='build')
 
-    extends('python@3:')
-#    extends('python@3:')
+    extends('python', type=('build', 'link','run'))
 
 #    conflicts('+opencl', when='+cuda')
 #    conflicts('+cuda', when='+opencl')
