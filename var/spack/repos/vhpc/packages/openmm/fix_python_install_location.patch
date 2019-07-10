@@ -7,7 +7,7 @@
 -# Install binary module (to system location)
 -set(PYTHON_SETUP_COMMAND "install --root=\$ENV{DESTDIR}/")
 +# Install binary module to OpenMM 'lib/python#.#/site-packages' dir
-+set(PYTHON_SETUP_COMMAND "install --prefix=\"${CMAKE_INSTALL_PREFIX}\"")
++set(PYTHON_SETUP_COMMAND "install --prefix=${CMAKE_INSTALL_PREFIX}")
  configure_file(pysetup.cmake.in
      "${CMAKE_CURRENT_BINARY_DIR}/pysetupinstall.cmake" @ONLY)
  add_custom_target(PythonInstall
