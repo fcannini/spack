@@ -51,7 +51,7 @@ class Openmm(CMakePackage):
     # These dependencies look weird, I know. See the link for an explanation:
     # http://docs.openmm.org/latest/userguide/library.html#other-required-software
     # TODO: optionally enable python bindings
-    depends_on('fftw')
+    depends_on('fftw +float')
     depends_on('cuda', when='+cuda')
     depends_on('cmake@3.1:', type='build')
     depends_on('doxygen', type='build')
