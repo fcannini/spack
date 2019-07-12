@@ -33,6 +33,8 @@ class PyJupyterNotebook(PythonPackage):
     version('4.0.3', '119beea793865ee4b1673a50043ead2a')
     version('4.0.2', '77f371e9a23a840d14d8a60fee7ba1b7')
 
+    patch('disable-bdist_egg.patch', sha256='4d0d0861cfa60930b8e94169dbf2e998f95f16d6f47e8f0a3bfbb8b46e4af714')
+
     variant('terminal', default=False, description="Enable terminal functionality")
 
     depends_on('python@2.7:2.8,3.3:')
