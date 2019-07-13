@@ -1,0 +1,10 @@
+--- a/msmbuilder/utils/param_sweep.py	2019-07-12 19:04:38.792000000 -0300
++++ b/msmbuilder/utils/param_sweep.py	2019-07-12 19:05:19.379000000 -0300
+@@ -1,6 +1,6 @@
+ from __future__ import print_function, division, absolute_import
+ from sklearn import clone
+-from sklearn.grid_search import ParameterGrid
++from sklearn.model_selection import ParameterGrid
+ from sklearn.externals.joblib import Parallel, delayed
+ 
+ __all__ = ['param_sweep']
