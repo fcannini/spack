@@ -39,5 +39,7 @@ class PyPyemma(PythonPackage):
     depends_on('py-tqdm')
     depends_on('py-mdtraj')
     depends_on('hdf5 ~mpi', type='build')
+    depends_on('py-mock', type='test')
+    depends_on('py-backports-functools-lru-cache', type='test')
 
     extends('python')
