@@ -40,11 +40,13 @@ class Tinker(Package):
             filename = phase + '.make'
             copy(join_path(build, 'linux', fc, filename), 'source/')
 
-        fftw_ld_flags = ' '.join(['-L' + str(spec['fftw'].libs), '-lfftw3_threads', '-lfftw3'])
+        fftw_ld_flags = ' '.join(['-L' + str(spec['fftw'].prefix.lib), '-lfftw3_threads', '-lfftw3'])
 
         with working_dir('source/'):
 
-            # Your cpu may or may not have it, e.g. arm or power
+            # Your cpu may or may not have it, e.g. : intel haswell and older, amd opteron 6100 and older
+            # Or not x86_64 at all (arm, power)
+            # Chances of happening upon such hardware are pretty slim in mid-2019, so leave it for now
             arch = spec.architecture
             if arch.target != 'x86_64':
                filter_file('-mavx ', '', 'compile.make')
@@ -54,13 +56,13 @@ class Tinker(Package):
 
             sh = which('bash')
 
-            [sh('-v', './' + phase + '.make') for phase in phases]
+            [sh('-x', './' + phase + '.make') for phase in phases]
 
         # rename to avoid overwriting a binary with the same name when installing
         with working_dir('perl/'): os.rename('bar', 'bar' + '.pl')
 
         # No need of this file to be in spec.prefix.bin
-        with working_dir('bin/'): os.remove('0README')
+        os.remove('bin/0README')
 
         def doinstall(d):
             with working_dir(d):
