@@ -25,10 +25,14 @@ class Python(AutotoolsPackage):
     """The Python programming language."""
 
     homepage = "https://www.python.org/"
-    url      = "https://www.python.org/ftp/python/3.7.2/Python-3.7.2.tgz"
+    url      = "https://www.python.org/ftp/python/3.7.4/Python-3.7.4.tgz"
     list_url = "https://www.python.org/downloads/"
     list_depth = 1
 
+    maintainers = ['adamjstewart']
+
+    version('3.7.4',  sha256='d63e63e14e6d29e17490abbe6f7d17afb3db182dbd801229f14e55f4157c4ba3')
+    version('3.7.3',  sha256='d62e3015f2f89c970ac52343976b406694931742fbde2fed8d1ce8ebb4e1f8ff')
     version('3.7.2',  sha256='f09d83c773b9cc72421abba2c317e4e6e05d919f9bcf34468e192b6a6c8e328d')
     version('3.7.1',  sha256='36c1b81ac29d0f8341f727ef40864d99d8206897be96be73dc34d4739c9c9f06')
     version('3.7.0',  '41b6595deb4147a1ed517a7d9a580271')
@@ -41,9 +45,11 @@ class Python(AutotoolsPackage):
     version('3.6.2', 'e1a36bfffdd1d3a780b1825daf16e56c')
     version('3.6.1', '2d0fc9f3a5940707590e07f03ecb08b9')
     version('3.6.0', '3f7062ccf8be76491884d0e47ac8b251')
+    version('3.5.7', sha256='542d94920a2a06a471a73b51614805ad65366af98145b0369bc374cf248b521b')
     version('3.5.2', '3fe8434643a78630c61c6464fe2e7e72')
     version('3.5.1', 'be78e48cdfc1a7ad90efff146dce6cfe')
     version('3.5.0', 'a56c0c0b45d75a0ec9c6dee933c41c36')
+    version('3.4.10', sha256='217757699249ab432571b381386d441e12b433100ab5f908051fcb7cced2539d')
     version('3.4.3', '4281ff86778db65892c05151d5de738d')
     version('3.3.6', 'cdb3cd08f96f074b3f3994ccb51063e9')
     version('3.2.6', '23815d82ae706e9b781ca65865353d39')
@@ -98,8 +104,10 @@ class Python(AutotoolsPackage):
     variant('ctypes',   default=True,  description='Build ctypes module')
     variant('tkinter',  default=False, description='Build tkinter module')
     variant('uuid',     default=False, description='Build uuid module')
+    variant('tix',      default=False, description='Build Tix module')
 
     depends_on('pkgconfig@0.9.0:', type='build')
+    depends_on('gettext')
 
     # Optional dependencies
     # See detect_modules() in setup.py for details
@@ -117,7 +125,14 @@ class Python(AutotoolsPackage):
     depends_on('libffi', when='+ctypes')
     depends_on('tk', when='+tkinter')
     depends_on('tcl', when='+tkinter')
-    depends_on('libuuid', when='+uuid')
+    depends_on('tix', when='+tix')
+    if sys.platform != 'darwin':
+        # On macOS systems, Spack's libuuid conflicts with the system-installed
+        # version and breaks anything linked against Cocoa/Carbon. Since the
+        # system-provided version is sufficient to build Python's UUID support,
+        # the easy solution is to only depend on Spack's libuuid when *not* on
+        # a Mac.
+        depends_on('libuuid', when='+uuid')
 
     patch('tkinter.patch', when='@:2.8,3.3: platform=darwin')
 
@@ -136,6 +151,13 @@ class Python(AutotoolsPackage):
         when='+optimizations',
         msg='+optimizations is incompatible with +shared in python@2.X'
     )
+    conflicts('+tix', when='~tkinter',
+              msg='python+tix requires python+tix+tkinter')
+
+    # Python 3.6.7 and above can not be compiled with the Intel compiler
+    # https://bugs.python.org/issue35473
+    # https://bugs.python.org/issue37415
+    conflicts('%intel', when='@3.6.7:')
 
     _DISTUTIL_VARS_TO_SAVE = ['LDSHARED']
     _DISTUTIL_CACHE_FILENAME = 'sysconfig.json'
@@ -143,6 +165,10 @@ class Python(AutotoolsPackage):
 
     # An in-source build with --enable-optimizations fails for python@3.X
     build_directory = 'spack-build'
+
+    def url_for_version(self, version):
+        url = "https://www.python.org/ftp/python/{0}/Python-{1}.tgz"
+        return url.format(re.split('[a-z]', str(version))[0], version)
 
     @when('@2.7:2.8,3.4:')
     def patch(self):

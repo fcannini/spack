@@ -18,6 +18,8 @@ class Openblas(MakefilePackage):
     git      = 'https://github.com/xianyi/OpenBLAS.git'
 
     version('develop', branch='develop')
+    version('0.3.7', sha256='bde136122cef3dd6efe2de1c6f65c10955bbb0cc01a520c2342f5287c28f9379')
+    version('0.3.6', sha256='e64c8fe083832ffbc1459ab6c72f71d53afd3b36e8497c922a15a06b72e9002f')
     version('0.3.5', sha256='0950c14bd77c90a6427e26210d6dab422271bc86f9fc69126725833ecdaa0e85')
     version('0.3.4', sha256='4b4b4453251e9edb5f57465bf2b3cf67b19d811d50c8588cdf2ea1f201bb834f')
     version('0.3.3', sha256='49d88f4494ae780e3d7fa51769c00d982d7cdb73e696054ac3baa81d42f13bab')
@@ -56,6 +58,18 @@ class Openblas(MakefilePackage):
         'virtual_machine',
         default=False,
         description="Adding options to build openblas on Linux virtual machine"
+    )
+
+    variant(
+        'avx2',
+        default=True,
+        description='Enable use of AVX2 instructions'
+    )
+
+    variant(
+        'avx512',
+        default=False,
+        description='Enable use of AVX512 instructions'
     )
 
     # virtual dependency
@@ -97,6 +111,9 @@ class Openblas(MakefilePackage):
     patch('https://github.com/xianyi/OpenBLAS/commit/79ea839b635d1fd84b6ce8a47e086f01d64198e6.patch',
           sha256='f1b066a4481a50678caeb7656bf3e6764f45619686ac465f257c8017a2dc1ff0',
           when='@0.3.0:0.3.3')
+
+    # Add conditions to f_check to determine the Fujitsu compiler
+    patch('openblas_fujitsu.patch', when='%fj')
 
     conflicts('%intel@16', when='@0.2.15:0.2.19')
 
@@ -149,7 +166,6 @@ class Openblas(MakefilePackage):
         if self.spec.variants['virtual_machine'].value:
             make_defs += [
                 'DYNAMIC_ARCH=1',
-                'NO_AVX2=1',
                 'NUM_THREADS=64',  # OpenBLAS stores present no of CPUs as max
             ]
 
@@ -191,6 +207,12 @@ class Openblas(MakefilePackage):
         # 64bit ints
         if '+ilp64' in self.spec:
             make_defs += ['INTERFACE64=1']
+
+        if 'x86' in self.spec.architecture.target.lower():
+            if '~avx2' in self.spec:
+                make_defs += ['NO_AVX2=1']
+            if '~avx512' in self.spec:
+                make_defs += ['NO_AVX512=1']
 
         return make_defs
 

@@ -16,6 +16,7 @@ import os
 import inspect
 import pstats
 import argparse
+import traceback
 from six import StringIO
 
 import llnl.util.tty as tty
@@ -245,9 +246,9 @@ class SpackArgumentParser(argparse.ArgumentParser):
 {help}:
   spack help --all       list all commands and options
   spack help <command>   help on a specific command
-  spack help --spec      help on the spec syntax
-  spack docs             open http://spack.rtfd.io/ in a browser"""
-.format(help=section_descriptions['help']))
+  spack help --spec      help on the package specification syntax
+  spack docs             open http://spack.rtfd.io/ in a browser
+""".format(help=section_descriptions['help']))
 
         # determine help from format above
         return formatter.format_help()
@@ -505,6 +506,7 @@ class SpackCommand(object):
             self.returncode = e.code
 
         except BaseException as e:
+            tty.debug(e)
             self.error = e
             if fail_on_error:
                 raise
@@ -577,9 +579,28 @@ def print_setup_info(*info):
 
     # print roots for all module systems
     module_roots = spack.config.get('config:module_roots')
+    module_to_roots = {
+        'tcl': list(),
+        'dotkit': list(),
+        'lmod': list()
+    }
     for name, path in module_roots.items():
         path = spack.util.path.canonicalize_path(path)
-        shell_set('_sp_%s_root' % name, path)
+        module_to_roots[name].append(path)
+
+    other_spack_instances = spack.config.get(
+        'upstreams') or {}
+    for install_properties in other_spack_instances.values():
+        upstream_module_roots = install_properties.get('modules', {})
+        for module_type, root in upstream_module_roots.items():
+            module_to_roots[module_type].append(root)
+
+    for name, paths in module_to_roots.items():
+        # Environment setup prepends paths, so the order is reversed here to
+        # preserve the intended priority: the modules of the local Spack
+        # instance are the highest-precedence.
+        roots_val = ':'.join(reversed(paths))
+        shell_set('_sp_%s_roots' % name, roots_val)
 
     # print environment module system if available. This can be expensive
     # on clusters, so skip it if not needed.
@@ -676,18 +697,23 @@ def main(argv=None):
             return _invoke_command(command, parser, args, unknown)
 
     except SpackError as e:
+        tty.debug(e)
         e.die()  # gracefully die on any SpackErrors
 
     except Exception as e:
         if spack.config.get('config:debug'):
             raise
-        tty.die(str(e))
+        tty.die(e)
 
     except KeyboardInterrupt:
+        if spack.config.get('config:debug'):
+            raise
         sys.stderr.write('\n')
         tty.die("Keyboard interrupt.")
 
     except SystemExit as e:
+        if spack.config.get('config:debug'):
+            traceback.print_exc()
         return e.code
 
 

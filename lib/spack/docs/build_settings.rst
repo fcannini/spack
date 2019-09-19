@@ -66,8 +66,18 @@ This example lists three installations of OpenMPI, one built with GCC,
 one built with GCC and debug information, and another built with Intel.
 If Spack is asked to build a package that uses one of these MPIs as a
 dependency, it will use the pre-installed OpenMPI in
-the given directory. ``packages.yaml`` can also be used to specify modules
-to load instead of the installation prefixes.
+the given directory. Note that the specified path is the top-level
+install prefix, not the ``bin`` subdirectory.
+
+``packages.yaml`` can also be used to specify modules to load instead
+of the installation prefixes.  The following example says that module
+``CMake/3.7.2`` provides cmake version 3.7.2.
+
+.. code-block:: yaml
+
+   cmake:
+     modules:
+       cmake@3.7.2: CMake/3.7.2
 
 Each ``packages.yaml`` begins with a ``packages:`` token, followed
 by a list of package names.  To specify externals, add a ``paths`` or ``modules``
@@ -138,7 +148,7 @@ Here's an example ``packages.yaml`` file that sets preferred packages:
      gperftools:
        version: [2.2, 2.4, 2.3]
      all:
-       compiler: [gcc@4.4.7, gcc@4.6:, intel, clang, pgi]
+       compiler: [gcc@4.4.7, 'gcc@4.6:', intel, clang, pgi]
        providers:
          mpi: [mvapich2, mpich, openmpi]
 

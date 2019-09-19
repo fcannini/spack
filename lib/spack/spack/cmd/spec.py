@@ -14,6 +14,7 @@ import spack
 import spack.cmd
 import spack.cmd.common.arguments as arguments
 import spack.spec
+import spack.hash_types as ht
 
 description = "show what would be installed, given a spec"
 section = "build"
@@ -42,11 +43,12 @@ def setup_parser(subparser):
 
 
 def spec(parser, args):
-    name_fmt = '$.' if args.namespaces else '$_'
+    name_fmt = '{namespace}.{name}' if args.namespaces else '{name}'
+    fmt = '{@version}{%compiler}{compiler_flags}{variants}{arch=architecture}'
     install_status_fn = spack.spec.Spec.install_status
     kwargs = {
         'cover': args.cover,
-        'format': name_fmt + '$@$%@+$+$=',
+        'format': name_fmt + fmt,
         'hashlen': None if args.very_long else 7,
         'show_types': args.types,
         'status_fn': install_status_fn if args.install_status else None
@@ -62,7 +64,7 @@ def spec(parser, args):
                 spec.concretize()
 
             # use write because to_yaml already has a newline.
-            sys.stdout.write(spec.to_yaml())
+            sys.stdout.write(spec.to_yaml(hash=ht.build_hash))
             continue
 
         kwargs['hashes'] = False  # Always False for input spec

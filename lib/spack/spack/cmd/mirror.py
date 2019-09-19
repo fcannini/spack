@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: (Apache-2.0 OR MIT)
 
+import sys
 import os
 from datetime import datetime
 
@@ -16,6 +17,7 @@ import spack.config
 import spack.mirror
 import spack.repo
 import spack.cmd.common.arguments as arguments
+import spack.environment as ev
 from spack.spec import Spec
 from spack.error import SpackError
 from spack.util.spack_yaml import syaml_dict
@@ -141,6 +143,7 @@ def _read_specs_from_file(filename):
                 s.package
                 specs.append(s)
             except SpackError as e:
+                tty.debug(e)
                 tty.die("Parse error in %s, line %d:" % (filename, i + 1),
                         ">>> " + string, str(e))
     return specs
@@ -159,10 +162,14 @@ def mirror_create(args):
                 tty.die("Cannot pass specs on the command line with --file.")
             specs = _read_specs_from_file(args.file)
 
-        # If nothing is passed, use all packages.
+        # If nothing is passed, use environment or all if no active env
         if not specs:
-            specs = [Spec(n) for n in spack.repo.all_package_names()]
-            specs.sort(key=lambda s: s.format("$_$@").lower())
+            env = ev.get_env(args, 'mirror')
+            if env:
+                specs = env.specs_by_hash.values()
+            else:
+                specs = [Spec(n) for n in spack.repo.all_package_names()]
+                specs.sort(key=lambda s: s.format("{name}{@version}").lower())
 
         # If the user asked for dependencies, traverse spec DAG get them.
         if args.dependencies:
@@ -204,7 +211,8 @@ def mirror_create(args):
             "  %-4d failed to fetch." % e)
         if error:
             tty.error("Failed downloads:")
-            colify(s.cformat("$_$@") for s in error)
+            colify(s.cformat("{name}{@version}") for s in error)
+            sys.exit(1)
 
 
 def mirror(parser, args):

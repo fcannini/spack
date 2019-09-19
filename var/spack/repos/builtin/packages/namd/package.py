@@ -16,6 +16,7 @@ class Namd(MakefilePackage):
     homepage = "http://www.ks.uiuc.edu/Research/namd/"
     url      = "file://{0}/NAMD_2.12_Source.tar.gz".format(os.getcwd())
 
+    version('2.13', '9e3323ed856e36e34d5c17a7b0341e38')
     version('2.12', '2a1191909b1ab03bf0205971ad4d8ee9')
     version('2.13', sha256='cb0b43f520ac6be761899326441541aa00de15897986223c8ce2f0f6e42b52bc')
 

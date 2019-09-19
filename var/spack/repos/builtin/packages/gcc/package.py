@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: (Apache-2.0 OR MIT)
 
 from spack import *
-from spack.operating_systems.mac_os import macos_version
+from spack.operating_systems.mac_os import macos_version, macos_sdk_path
 from llnl.util import tty
 
 import glob
@@ -23,6 +23,10 @@ class Gcc(AutotoolsPackage):
     list_depth = 1
 
     version('develop', svn=svn + 'trunk')
+
+    version('9.2.0', 'a12dff52af876aee0fd89a8d09cdc455f35ec46845e154023202392adc164848faf8ee881b59b681b696e27c69fd143a214014db4214db62f9891a1c8365c040')
+    version('9.1.0', 'b6134df027e734cee5395afd739fcfa4ea319a6017d662e54e89df927dea19d3fff7a6e35d676685383034e3db01c9d0b653f63574c274eeb15a2cb0bc7a1f28')
+
     version('8.3.0', '1811337ae3add9680cec64968a2509d085b6dc5b6783fc1e8c295e3e47416196fd1a3ad8dfe7e10be2276b4f62c357659ce2902f239f60a8648548231b4b5802')
     version('8.2.0', '64898a165f67e136d802a92e7633bf1b06c85266027e52127ea025bf5fc2291b5e858288aac0bdba246e6cdf7c6ec88bc8e0e7f3f6f1985f4297710cafde56ed')
     version('8.1.0', '65f7c65818dc540b3437605026d329fc')
@@ -111,12 +115,10 @@ class Gcc(AutotoolsPackage):
     # nvptx-tools does not seem to work as a dependency,
     # but does fine when the source is inside the gcc build directory
     # nvptx-tools doesn't have any releases, so grabbing the last commit
-    resource(
-             name='nvptx-tools',
+    resource(name='nvptx-tools',
              git='https://github.com/MentorEmbedded/nvptx-tools',
              commit='5f6f343a302d620b0868edab376c00b15741e39e',
-             when='+nvptx'
-    )
+             when='+nvptx')
 
     # TODO: integrate these libraries.
     # depends_on('ppl')
@@ -325,6 +327,12 @@ class Gcc(AutotoolsPackage):
                             '--disable-bootstrap',
                             '--disable-multilib'])
 
+        if sys.platform == 'darwin':
+            options.extend([
+                '--with-native-system-header-dir=/usr/include',
+                '--with-sysroot={0}'.format(macos_sdk_path())
+            ])
+
         return options
 
     # run configure/make/make(install) for the nvptx-none target
@@ -410,7 +418,7 @@ class Gcc(AutotoolsPackage):
            the compiler used to build the executable."""
         if not self.spec_dir:
             tty.warn('Could not install specs for {0}.'.format(
-                     self.spec.format('$_$@')))
+                     self.spec.format('{name}{@version}')))
             return
 
         gcc = self.spec['gcc'].command
