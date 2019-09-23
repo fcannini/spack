@@ -36,8 +36,7 @@ class LuaLuafilesystem(Package):
         semver = version[0:3]
         tweak_level = version[3] if len(version) > 3 else 1
         fmt = os.path.join(
-            self.stage.path,
-            'luafilesystem-{version.underscored}',
+            self.stage.source_path,
             'rockspecs',
             'luafilesystem-{semver.dotted}-{tweak_level}.rockspec'
         )
@@ -46,4 +45,4 @@ class LuaLuafilesystem(Package):
         )
 
     def install(self, spec, prefix):
-        luarocks('--tree=' + prefix, 'install', self.rockspec)
+        luarocks('--tree=' + prefix, 'make', self.rockspec)

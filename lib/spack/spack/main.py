@@ -16,6 +16,8 @@ import os
 import inspect
 import pstats
 import argparse
+import traceback
+import warnings
 from six import StringIO
 
 import llnl.util.tty as tty
@@ -245,9 +247,9 @@ class SpackArgumentParser(argparse.ArgumentParser):
 {help}:
   spack help --all       list all commands and options
   spack help <command>   help on a specific command
-  spack help --spec      help on the spec syntax
-  spack docs             open http://spack.rtfd.io/ in a browser"""
-.format(help=section_descriptions['help']))
+  spack help --spec      help on the package specification syntax
+  spack docs             open http://spack.rtfd.io/ in a browser
+""".format(help=section_descriptions['help']))
 
         # determine help from format above
         return formatter.format_help()
@@ -388,8 +390,16 @@ def make_argument_parser(**kwargs):
     return parser
 
 
+def send_warning_to_tty(message, *args):
+    """Redirects messages to tty.warn."""
+    tty.warn(message)
+
+
 def setup_main_options(args):
     """Configure spack globals based on the basic options."""
+    # Assign a custom function to show warnings
+    warnings.showwarning = send_warning_to_tty
+
     # Set up environment based on args.
     tty.set_verbose(args.verbose)
     tty.set_debug(args.debug)
@@ -505,6 +515,7 @@ class SpackCommand(object):
             self.returncode = e.code
 
         except BaseException as e:
+            tty.debug(e)
             self.error = e
             if fail_on_error:
                 raise
@@ -695,18 +706,23 @@ def main(argv=None):
             return _invoke_command(command, parser, args, unknown)
 
     except SpackError as e:
+        tty.debug(e)
         e.die()  # gracefully die on any SpackErrors
 
     except Exception as e:
         if spack.config.get('config:debug'):
             raise
-        tty.die(str(e))
+        tty.die(e)
 
     except KeyboardInterrupt:
+        if spack.config.get('config:debug'):
+            raise
         sys.stderr.write('\n')
         tty.die("Keyboard interrupt.")
 
     except SystemExit as e:
+        if spack.config.get('config:debug'):
+            traceback.print_exc()
         return e.code
 
 

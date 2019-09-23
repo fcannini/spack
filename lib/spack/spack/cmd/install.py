@@ -223,7 +223,8 @@ def install(parser, args, **kwargs):
         env = ev.get_env(args, 'install')
         if env:
             if not args.only_concrete:
-                env.concretize()
+                concretized_specs = env.concretize()
+                ev.display_specs(concretized_specs)
                 env.write()
             tty.msg("Installing environment %s" % env.name)
             env.install_all(args)
@@ -262,6 +263,7 @@ def install(parser, args, **kwargs):
         specs = spack.cmd.parse_specs(
             args.package, concretize=True, tests=tests)
     except SpackError as e:
+        tty.debug(e)
         reporter.concretization_report(e.message)
         raise
 

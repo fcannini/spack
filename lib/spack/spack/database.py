@@ -606,8 +606,7 @@ class Database(object):
                 except Exception as e:
                     # Something went wrong, so the spec was not restored
                     # from old data
-                    tty.debug(e.message)
-                    pass
+                    tty.debug(e)
 
             self._check_ref_counts()
 
@@ -659,7 +658,8 @@ class Database(object):
             with open(temp_file, 'w') as f:
                 self._write_to_file(f)
             os.rename(temp_file, self._index_path)
-        except BaseException:
+        except BaseException as e:
+            tty.debug(e)
             # Clean up temp file if something goes wrong.
             if os.path.exists(temp_file):
                 os.remove(temp_file)
@@ -875,7 +875,8 @@ class Database(object):
             return self._remove(spec)
 
     @_autospec
-    def installed_relatives(self, spec, direction='children', transitive=True):
+    def installed_relatives(self, spec, direction='children', transitive=True,
+                            deptype='all'):
         """Return installed specs related to this one."""
         if direction not in ('parents', 'children'):
             raise ValueError("Invalid direction: %s" % direction)
@@ -883,11 +884,12 @@ class Database(object):
         relatives = set()
         for spec in self.query(spec):
             if transitive:
-                to_add = spec.traverse(direction=direction, root=False)
+                to_add = spec.traverse(
+                    direction=direction, root=False, deptype=deptype)
             elif direction == 'parents':
-                to_add = spec.dependents()
+                to_add = spec.dependents(deptype=deptype)
             else:  # direction == 'children'
-                to_add = spec.dependencies()
+                to_add = spec.dependencies(deptype=deptype)
 
             for relative in to_add:
                 hash_key = relative.dag_hash()
@@ -934,6 +936,73 @@ class Database(object):
             except spack.directory_layout.NoSuchExtensionError:
                 continue
             # TODO: conditional way to do this instead of catching exceptions
+
+    def get_by_hash_local(self, dag_hash, default=None, installed=any):
+        """Look up a spec in *this DB* by DAG hash, or by a DAG hash prefix.
+
+        Arguments:
+            dag_hash (str): hash (or hash prefix) to look up
+            default (object, optional): default value to return if dag_hash is
+                not in the DB (default: None)
+            installed (bool or any, optional): if ``True``, includes only
+                installed specs in the search; if ``False`` only missing specs,
+                and if ``any``, either installed or missing (default: any)
+
+        ``installed`` defaults to ``any`` so that we can refer to any
+        known hash.  Note that ``query()`` and ``query_one()`` differ in
+        that they only return installed specs by default.
+
+        Returns:
+            (list): a list of specs matching the hash or hash prefix
+
+        """
+        with self.read_transaction():
+            # hash is a full hash and is in the data somewhere
+            if dag_hash in self._data:
+                rec = self._data[dag_hash]
+                if installed is any or rec.installed == installed:
+                    return [rec.spec]
+                else:
+                    return default
+
+            # check if hash is a prefix of some installed (or previously
+            # installed) spec.
+            matches = [record.spec for h, record in self._data.items()
+                       if h.startswith(dag_hash) and
+                       (installed is any or installed == record.installed)]
+            if matches:
+                return matches
+
+            # nothing found
+            return default
+
+    def get_by_hash(self, dag_hash, default=None, installed=any):
+        """Look up a spec by DAG hash, or by a DAG hash prefix.
+
+        Arguments:
+            dag_hash (str): hash (or hash prefix) to look up
+            default (object, optional): default value to return if dag_hash is
+                not in the DB (default: None)
+            installed (bool or any, optional): if ``True``, includes only
+                installed specs in the search; if ``False`` only missing specs,
+                and if ``any``, either installed or missing (default: any)
+
+        ``installed`` defaults to ``any`` so that we can refer to any
+        known hash.  Note that ``query()`` and ``query_one()`` differ in
+        that they only return installed specs by default.
+
+        Returns:
+            (list): a list of specs matching the hash or hash prefix
+
+        """
+        search_path = [self] + self.upstream_dbs
+        for db in search_path:
+            spec = db.get_by_hash_local(
+                dag_hash, default=default, installed=installed)
+            if spec is not None:
+                return spec
+
+        return default
 
     def _query(
             self,

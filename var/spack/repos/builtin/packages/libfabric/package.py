@@ -15,6 +15,8 @@ class Libfabric(AutotoolsPackage):
     git      = "https://github.com/ofiwg/libfabric.git"
 
     version('develop', branch='master')
+    version('1.8.0', sha256='c4763383a96af4af52cd81b3b094227f5cf8e91662f861670965994539b7ee37',
+       url='https://github.com/ofiwg/libfabric/releases/download/v1.8.0/libfabric-1.8.0.tar.bz2')
     version('1.7.1', sha256='312e62c57f79b7274f89c41823932c00b15f1cc8de9c1f8dce17cd7fdae66fa1')
     version('1.7.0', sha256='9d7059e2ef48341f967f2a20ee215bc50f9079b32aad485f654098f83040e4be')
     version('1.6.2', sha256='b1a9cf8c47189a1c918f8b5710d05cb50df6b47a1c9b2ba51d927e97503b4df0')
@@ -34,15 +36,22 @@ class Libfabric(AutotoolsPackage):
                'udp',
                'rxm',
                'rxd',
-               'mlx')
+               'mlx',
+               'tcp',
+               'efa')
 
-    variant(
-       'fabrics',
-       default='sockets',
-       description='A list of enabled fabrics',
-       values=fabrics,
-       multi=True
-    )
+    variant('fabrics',
+            default='sockets',
+            description='A list of enabled fabrics',
+            values=fabrics,
+            multi=True)
+
+    # NOTE: the 'kdreg' variant enables use of the special /dev/kdreg file to
+    #   assist in memory registration caching in the GNI provider.  This
+    #   device file can only be opened once per process, however, and thus it
+    #   frequently conflicts with MPI.
+    variant('kdreg', default=False,
+            description='Enable kdreg on supported Cray platforms')
 
     depends_on('rdma-core', when='fabrics=verbs')
     depends_on('opa-psm2', when='fabrics=psm2')
@@ -94,6 +103,11 @@ class Libfabric(AutotoolsPackage):
 
     def configure_args(self):
         args = []
+
+        if '+kdreg' in self.spec:
+            args.append('--with-kdreg=yes')
+        else:
+            args.append('--with-kdreg=no')
 
         for fabric in self.fabrics:
             if 'fabrics=' + fabric in self.spec:

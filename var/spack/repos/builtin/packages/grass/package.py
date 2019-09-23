@@ -48,6 +48,8 @@ class Grass(AutotoolsPackage):
     depends_on('flex', type='build')
     depends_on('bison', type='build')
     depends_on('proj')
+    depends_on('proj@:4', when='@:7.5')
+    depends_on('proj@:5', when='@:7.7')
     depends_on('gdal')
     depends_on('python@2.7:2.9', type=('build', 'run'))
     depends_on('libx11')
@@ -193,3 +195,12 @@ class Grass(AutotoolsPackage):
             args.append('--without-geos')
 
         return args
+
+    # see issue: https://github.com/spack/spack/issues/11325
+    # 'Platform.make' is created after configure step
+    # hence invoke the following function afterwards
+    @run_after('configure')
+    def fix_iconv_linking(self):
+        makefile = FileFilter('include/Make/Platform.make')
+        makefile.filter(r'^ICONVLIB\s*=\s*', 'ICONVLIB = -liconv')
+        return None

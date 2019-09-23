@@ -5,6 +5,8 @@
 
 import pytest
 
+import sys
+
 from copy import copy
 from six import iteritems
 
@@ -23,7 +25,55 @@ import spack.compilers.xl
 import spack.compilers.xl_r
 import spack.compilers.fj
 
-from spack.compiler import _get_versioned_tuple, Compiler
+from spack.compiler import Compiler
+
+
+@pytest.fixture()
+def make_args_for_version(monkeypatch):
+
+    def _factory(version, path='/usr/bin/gcc'):
+        class MockOs(object):
+            pass
+
+        compiler_name = 'gcc'
+        compiler_cls = compilers.class_for_compiler_name(compiler_name)
+        monkeypatch.setattr(compiler_cls, 'cc_version', lambda x: version)
+
+        compiler_id = compilers.CompilerID(
+            os=MockOs, compiler_name=compiler_name, version=None
+        )
+        variation = compilers.NameVariation(prefix='', suffix='')
+        return compilers.DetectVersionArgs(
+            id=compiler_id, variation=variation, language='cc', path=path
+        )
+
+    return _factory
+
+
+def test_multiple_conflicting_compiler_definitions(mutable_config):
+    compiler_def = {
+        'compiler': {
+            'flags': {},
+            'modules': [],
+            'paths': {
+                'cc': 'cc',
+                'cxx': 'cxx',
+                'f77': 'null',
+                'fc': 'null'},
+            'extra_rpaths': [],
+            'operating_system': 'test',
+            'target': 'test',
+            'environment': {},
+            'spec': 'clang@0.0.0'}}
+
+    compiler_config = [compiler_def, compiler_def]
+    compiler_config[0]['compiler']['paths']['f77'] = 'f77'
+    mutable_config.update_config('compilers', compiler_config)
+
+    arch_spec = spack.spec.ArchSpec(('test', 'test', 'test'))
+    cspec = compiler_config[0]['compiler']['spec']
+    cmp = compilers.compiler_for_spec(cspec, arch_spec)
+    assert cmp.f77 == 'f77'
 
 
 def test_get_compiler_duplicates(config):
@@ -45,17 +95,22 @@ def test_all_compilers(config):
     assert len(filtered) == 1
 
 
-def test_version_detection_is_empty():
-    no_version = lambda x: None
-    compiler_check_tuple = ('/usr/bin/gcc', '', r'\d\d', no_version)
-    assert not _get_versioned_tuple(compiler_check_tuple)
+@pytest.mark.skipif(
+    sys.version_info[0] == 2, reason='make_args_for_version requires python 3'
+)
+@pytest.mark.parametrize('input_version,expected_version,expected_error', [
+    (None, None,  "Couldn't get version for compiler /usr/bin/gcc"),
+    ('4.9', '4.9', None)
+])
+def test_version_detection_is_empty(
+        make_args_for_version, input_version, expected_version, expected_error
+):
+    args = make_args_for_version(version=input_version)
+    result, error = compilers.detect_version(args)
+    if not error:
+        assert result.id.version == expected_version
 
-
-def test_version_detection_is_successful():
-    version = lambda x: '4.9'
-    compiler_check_tuple = ('/usr/bin/gcc', '', r'\d\d', version)
-    assert _get_versioned_tuple(compiler_check_tuple) == (
-        '4.9', '', r'\d\d', '/usr/bin/gcc')
+    assert error == expected_error
 
 
 def test_compiler_flags_from_config_are_grouped():
@@ -74,7 +129,7 @@ def test_compiler_flags_from_config_are_grouped():
         'modules': None
     }
 
-    compiler = compilers.compiler_from_config_entry(compiler_entry)
+    compiler = compilers.compiler_from_dict(compiler_entry)
     assert any(x == '-foo-flag foo-val' for x in compiler.flags['cflags'])
 
 
@@ -115,6 +170,24 @@ class MockCompiler(Compiler):
     def version(self):
         return "1.0.0"
 
+    required_libs = ['libgfortran']
+
+
+def test_implicit_rpaths(dirs_with_libfiles, monkeypatch):
+    lib_to_dirs, all_dirs = dirs_with_libfiles
+
+    def try_all_dirs(*args):
+        return all_dirs
+
+    monkeypatch.setattr(MockCompiler, '_get_compiler_link_paths', try_all_dirs)
+
+    expected_rpaths = set(lib_to_dirs['libstdc++'] +
+                          lib_to_dirs['libgfortran'])
+
+    compiler = MockCompiler()
+    retrieved_rpaths = compiler.implicit_rpaths()
+    assert set(retrieved_rpaths) == expected_rpaths
+
 
 # Get the desired flag from the specified compiler spec.
 def flag_value(flag, spec):
@@ -124,9 +197,7 @@ def flag_value(flag, spec):
     else:
         compiler_entry = copy(default_compiler_entry)
         compiler_entry['spec'] = spec
-        # Disable faulty id()-based cache (issue #7647).
-        compilers._compiler_cache = {}
-        compiler = compilers.compiler_from_config_entry(compiler_entry)
+        compiler = compilers.compiler_from_dict(compiler_entry)
 
     return getattr(compiler, flag)
 
@@ -164,7 +235,8 @@ def test_clang_flags():
     supported_flag_test("pic_flag", "-fPIC", "gcc@4.0")
 
     # Apple Clang.
-    unsupported_flag_test("openmp_flag", "clang@2.0.0-apple")
+    supported_flag_test(
+        "openmp_flag", "-Xpreprocessor -fopenmp", "clang@2.0.0-apple")
     unsupported_flag_test("cxx11_flag", "clang@2.0.0-apple")
     supported_flag_test("cxx11_flag", "-std=c++11", "clang@4.0.0-apple")
     unsupported_flag_test("cxx14_flag", "clang@5.0.0-apple")
@@ -245,11 +317,13 @@ def test_xl_r_flags():
 
 
 def test_fj_flags():
-    supported_flag_test("openmp_flag", "-Kopenmp", "fj@1.2.0")
-    supported_flag_test("cxx98_flag", "-std=c++98", "fj@1.2.0")
-    supported_flag_test("cxx11_flag", "-std=c++11", "fj@1.2.0")
-    supported_flag_test("cxx14_flag", "-std=c++14", "fj@1.2.0")
-    supported_flag_test("pic_flag", "-fPIC", "fj@1.2.0")
+    supported_flag_test("openmp_flag", "-Kopenmp", "fj@4.0.0")
+    supported_flag_test("cxx98_flag", "-std=c++98", "fj@4.0.0")
+    supported_flag_test("cxx11_flag", "-std=c++11", "fj@4.0.0")
+    supported_flag_test("cxx14_flag", "-std=c++14", "fj@4.0.0")
+    supported_flag_test("c99_flag", "-std=c99", "fj@4.0.0")
+    supported_flag_test("c11_flag", "-std=c11", "fj@4.0.0")
+    supported_flag_test("pic_flag", "-KPIC", "fj@4.0.0")
 
 
 @pytest.mark.regression('10191')
@@ -266,6 +340,10 @@ def test_fj_flags():
     ('clang version 3.1 (trunk 149096)\n'
      'Target: x86_64-unknown-linux-gnu\n'
      'Thread model: posix\n', '3.1'),
+    ('clang version 8.0.0-3~ubuntu18.04.1 (tags/RELEASE_800/final)\n'
+     'Target: x86_64-pc-linux-gnu\n'
+     'Thread model: posix\n'
+     'InstalledDir: /usr/bin\n', '8.0.0')
 ])
 def test_clang_version_detection(version_str, expected_version):
     version = compilers.clang.Clang.extract_version_from_output(version_str)

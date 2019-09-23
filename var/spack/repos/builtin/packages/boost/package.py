@@ -102,6 +102,20 @@ class Boost(Package):
         variant(lib, default=(lib not in default_noinstall_libs),
                 description="Compile with {0} library".format(lib))
 
+    @property
+    def libs(self):
+        query = self.spec.last_query.extra_parameters
+        shared = '+shared' in self.spec
+
+        libnames = query if query else [lib for lib in self.all_libs
+                                        if self.spec.satisfies('+%s' % lib)]
+        libnames += ['monitor']
+        libraries = ['libboost_*%s*' % lib for lib in libnames]
+
+        return find_libraries(
+            libraries, root=self.prefix, shared=shared, recursive=True
+        )
+
     variant('cxxstd',
             default='98',
             values=('98', '11', '14', '17'),
@@ -128,6 +142,12 @@ class Boost(Package):
     variant('pic', default=False,
             description='Generate position-independent code (PIC), useful '
                         'for building static libraries')
+
+    # https://boostorg.github.io/build/manual/develop/index.html#bbv2.builtin.features.visibility
+    variant('visibility', values=('global', 'protected', 'hidden'),
+            default='hidden', multi=False,
+            description='Default symbol visibility in compiled libraries '
+            '(1.69.0 or later)')
 
     depends_on('icu4c', when='+icu')
     depends_on('python', when='+python')
@@ -163,7 +183,7 @@ class Boost(Package):
     patch('xl_1_62_0_le.patch', when='@1.62.0%xl')
 
     # Patch fix from https://svn.boost.org/trac/boost/ticket/10125
-    patch('call_once_variadic.patch', when='@1.54.0:1.55.9999%gcc@5.0:5.9')
+    patch('call_once_variadic.patch', when='@1.54.0:1.55.9999%gcc@5.0:')
 
     # Patch fix for PGI compiler
     patch('boost_1.67.0_pgi.patch', when='@1.67.0:1.68.9999%pgi')
@@ -180,6 +200,13 @@ class Boost(Package):
     patch('system-non-virtual-dtor-test.patch', when='@1.69.0',
           working_dir='libs/system', level=1)
 
+    # Change the method for version analysis when using Fujitsu compiler.
+    patch('fujitsu_version_analysis.patch', when='@1.67.0:%fj')
+
+    # Add option to C/C++ compile commands in clang-linux.jam
+    patch('clang-linux_add_option.patch', when='@1.56.0:1.63.0')
+    patch('clang-linux_add_option2.patch', when='@:1.55.0')
+
     def url_for_version(self, version):
         if version >= Version('1.63.0'):
             url = "https://dl.bintray.com/boostorg/release/{0}/source/boost_{1}.tar.bz2"
@@ -195,9 +222,11 @@ class Boost(Package):
         toolsets = {'g++': 'gcc',
                     'icpc': 'intel',
                     'clang++': 'clang',
+                    'armclang++': 'clang',
                     'xlc++': 'xlcpp',
                     'xlc++_r': 'xlcpp',
-                    'pgc++': 'pgi'}
+                    'pgc++': 'pgi',
+                    'FCC': 'clang'}
 
         if spec.satisfies('@1.47:'):
             toolsets['icpc'] += '-linux'
@@ -222,7 +251,12 @@ class Boost(Package):
 
     def determine_bootstrap_options(self, spec, with_libs, options):
         boost_toolset_id = self.determine_toolset(spec)
-        options.append('--with-toolset=%s' % boost_toolset_id)
+
+        # Arm compiler bootstraps with 'gcc' (but builds as 'clang')
+        if spec.satisfies('%arm'):
+            options.append('--with-toolset=gcc')
+        else:
+            options.append('--with-toolset=%s' % boost_toolset_id)
         options.append("--with-libraries=%s" % ','.join(with_libs))
 
         if '+python' in spec:
@@ -335,6 +369,10 @@ class Boost(Package):
         if cxxflags:
             options.append('cxxflags="{0}"'.format(' '.join(cxxflags)))
 
+        # Visibility was added in 1.69.0.
+        if spec.satisfies('@1.69.0:'):
+            options.append('visibility=%s' % spec.variants['visibility'].value)
+
         return threading_opts
 
     def add_buildopt_symlinks(self, prefix):
@@ -370,19 +408,19 @@ class Boost(Package):
             return
 
         # Remove libraries that the release version does not support
-        if spec.satisfies('@1.69.0:'):
+        if spec.satisfies('@1.69.0:') and 'signals' in with_libs:
             with_libs.remove('signals')
-        if not spec.satisfies('@1.54.0:'):
+        if not spec.satisfies('@1.54.0:') and 'log' in with_libs:
             with_libs.remove('log')
-        if not spec.satisfies('@1.53.0:'):
+        if not spec.satisfies('@1.53.0:') and 'atomic' in with_libs:
             with_libs.remove('atomic')
-        if not spec.satisfies('@1.48.0:'):
+        if not spec.satisfies('@1.48.0:') and 'locale' in with_libs:
             with_libs.remove('locale')
-        if not spec.satisfies('@1.47.0:'):
+        if not spec.satisfies('@1.47.0:') and 'chrono' in with_libs:
             with_libs.remove('chrono')
-        if not spec.satisfies('@1.43.0:'):
+        if not spec.satisfies('@1.43.0:') and 'random' in with_libs:
             with_libs.remove('random')
-        if not spec.satisfies('@1.39.0:'):
+        if not spec.satisfies('@1.39.0:') and 'exception' in with_libs:
             with_libs.remove('exception')
         if '+graph' in spec and '+mpi' in spec:
             with_libs.append('graph_parallel')

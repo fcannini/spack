@@ -29,7 +29,6 @@ from spack.util.gpg import Gpg
 from spack.util.web import spider, read_from_url
 from spack.util.executable import ProcessError
 
-
 _build_cache_relative_path = 'build_cache'
 
 
@@ -154,23 +153,19 @@ def write_buildinfo_file(prefix, workdir, rel=False):
                         msg += 'cannot be relocated.'
                         tty.warn(msg)
 
-            #  Check if the file contains a string with the installroot.
-            #  This cuts down on the number of files added to the list
-            #  of files potentially needing relocation
-            elif relocate.strings_contains_installroot(
-                    path_name,
-                    spack.store.layout.root):
-                if relocate.needs_binary_relocation(m_type, m_subtype):
+            if relocate.needs_binary_relocation(m_type, m_subtype):
+                if not filename.endswith('.o'):
                     rel_path_name = os.path.relpath(path_name, prefix)
                     binary_to_relocate.append(rel_path_name)
-                elif relocate.needs_text_relocation(m_type, m_subtype):
-                    rel_path_name = os.path.relpath(path_name, prefix)
-                    text_to_relocate.append(rel_path_name)
+            if relocate.needs_text_relocation(m_type, m_subtype):
+                rel_path_name = os.path.relpath(path_name, prefix)
+                text_to_relocate.append(rel_path_name)
 
     # Create buildinfo data and write it to disk
     buildinfo = {}
     buildinfo['relative_rpaths'] = rel
     buildinfo['buildpath'] = spack.store.layout.root
+    buildinfo['spackprefix'] = spack.paths.prefix
     buildinfo['relative_prefix'] = os.path.relpath(
         prefix, spack.store.layout.root)
     buildinfo['relocate_textfiles'] = text_to_relocate
@@ -313,6 +308,7 @@ def build_tarball(spec, outdir, force=False, rel=False, unsigned=False,
             os.remove(specfile_path)
         else:
             raise NoOverwriteException(str(specfile_path))
+
     # make a copy of the install directory to work with
     workdir = os.path.join(tempfile.mkdtemp(), os.path.basename(spec.prefix))
     install_tree(spec.prefix, workdir, symlinks=True)
@@ -320,22 +316,22 @@ def build_tarball(spec, outdir, force=False, rel=False, unsigned=False,
     # create info for later relocation and create tar
     write_buildinfo_file(spec.prefix, workdir, rel=rel)
 
-    # optinally make the paths in the binaries relative to each other
+    # optionally make the paths in the binaries relative to each other
     # in the spack install tree before creating tarball
     if rel:
         try:
-            make_package_relative(workdir, spec.prefix, allow_root)
+            make_package_relative(workdir, spec, allow_root)
         except Exception as e:
             shutil.rmtree(workdir)
             shutil.rmtree(tarfile_dir)
-            tty.die(str(e))
+            tty.die(e)
     else:
         try:
-            make_package_placeholder(workdir, spec.prefix, allow_root)
+            make_package_placeholder(workdir, spec, allow_root)
         except Exception as e:
             shutil.rmtree(workdir)
             shutil.rmtree(tarfile_dir)
-            tty.die(str(e))
+            tty.die(e)
     # create compressed tarball of the install prefix
     with closing(tarfile.open(tarfile_path, 'w:gz')) as tar:
         tar.add(name='%s' % workdir,
@@ -415,11 +411,12 @@ def download_tarball(spec):
     return None
 
 
-def make_package_relative(workdir, prefix, allow_root):
+def make_package_relative(workdir, spec, allow_root):
     """
     Change paths in binaries to relative paths. Change absolute symlinks
     to relative symlinks.
     """
+    prefix = spec.prefix
     buildinfo = read_buildinfo_file(workdir)
     old_path = buildinfo['buildpath']
     orig_path_names = list()
@@ -427,8 +424,12 @@ def make_package_relative(workdir, prefix, allow_root):
     for filename in buildinfo['relocate_binaries']:
         orig_path_names.append(os.path.join(prefix, filename))
         cur_path_names.append(os.path.join(workdir, filename))
-    relocate.make_binary_relative(cur_path_names, orig_path_names,
-                                  old_path, allow_root)
+    if spec.architecture.platform == 'darwin':
+        relocate.make_macho_binaries_relative(cur_path_names, orig_path_names,
+                                              old_path, allow_root)
+    else:
+        relocate.make_elf_binaries_relative(cur_path_names, orig_path_names,
+                                            old_path, allow_root)
     orig_path_names = list()
     cur_path_names = list()
     for filename in buildinfo.get('relocate_links', []):
@@ -437,15 +438,17 @@ def make_package_relative(workdir, prefix, allow_root):
     relocate.make_link_relative(cur_path_names, orig_path_names)
 
 
-def make_package_placeholder(workdir, prefix, allow_root):
+def make_package_placeholder(workdir, spec, allow_root):
     """
-    Change paths in binaries to placeholder paths
+    Check if package binaries are relocatable.
+    Change links to placeholder links.
     """
+    prefix = spec.prefix
     buildinfo = read_buildinfo_file(workdir)
     cur_path_names = list()
     for filename in buildinfo['relocate_binaries']:
         cur_path_names.append(os.path.join(workdir, filename))
-    relocate.make_binary_placeholder(cur_path_names, allow_root)
+    relocate.check_files_relocatable(cur_path_names, allow_root)
 
     cur_path_names = list()
     for filename in buildinfo.get('relocate_links', []):
@@ -453,13 +456,15 @@ def make_package_placeholder(workdir, prefix, allow_root):
     relocate.make_link_placeholder(cur_path_names, workdir, prefix)
 
 
-def relocate_package(workdir, allow_root):
+def relocate_package(workdir, spec, allow_root):
     """
     Relocate the given package
     """
     buildinfo = read_buildinfo_file(workdir)
     new_path = spack.store.layout.root
+    new_prefix = spack.paths.prefix
     old_path = buildinfo['buildpath']
+    old_prefix = buildinfo.get('spackprefix', '/not/in/buildinfo/dictionary')
     rel = buildinfo.get('relative_rpaths', False)
     if rel:
         return
@@ -472,7 +477,9 @@ def relocate_package(workdir, allow_root):
         # Don't add backup files generated by filter_file during install step.
         if not path_name.endswith('~'):
             path_names.add(path_name)
-    relocate.relocate_text(path_names, old_path, new_path)
+    relocate.relocate_text(path_names, oldpath=old_path,
+                           newpath=new_path, oldprefix=old_prefix,
+                           newprefix=new_prefix)
     # If the binary files in the package were not edited to use
     # relative RPATHs, then the RPATHs need to be relocated
     if not rel:
@@ -480,7 +487,12 @@ def relocate_package(workdir, allow_root):
         for filename in buildinfo['relocate_binaries']:
             path_name = os.path.join(workdir, filename)
             path_names.add(path_name)
-        relocate.relocate_binary(path_names, old_path, new_path, allow_root)
+        if spec.architecture.platform == 'darwin':
+            relocate.relocate_macho_binaries(path_names, old_path,
+                                             new_path, allow_root)
+        else:
+            relocate.relocate_elf_binaries(path_names, old_path,
+                                           new_path, allow_root)
         path_names = set()
         for filename in buildinfo.get('relocate_links', []):
             path_name = os.path.join(workdir, filename)
@@ -516,7 +528,7 @@ def extract_tarball(spec, filename, allow_root=False, unsigned=False,
                 Gpg.verify('%s.asc' % specfile_path, specfile_path)
             except Exception as e:
                 shutil.rmtree(tmpdir)
-                tty.die(str(e))
+                tty.die(e)
         else:
             shutil.rmtree(tmpdir)
             raise NoVerifyException(
@@ -567,10 +579,10 @@ def extract_tarball(spec, filename, allow_root=False, unsigned=False,
     os.remove(specfile_path)
 
     try:
-        relocate_package(workdir, allow_root)
+        relocate_package(workdir, spec, allow_root)
     except Exception as e:
         shutil.rmtree(workdir)
-        tty.die(str(e))
+        tty.die(e)
     # Delay creating spec.prefix until verification is complete
     # and any relocation has been done.
     else:
@@ -602,7 +614,8 @@ def get_specs(force=False):
     urls = set()
     for mirror_name, mirror_url in mirrors.items():
         if mirror_url.startswith('file'):
-            mirror = mirror_url.replace('file://', '') + "/" + _build_cache_relative_path
+            mirror = mirror_url.replace(
+                'file://', '') + "/" + _build_cache_relative_path
             tty.msg("Finding buildcaches in %s" % mirror)
             if os.path.exists(mirror):
                 files = os.listdir(mirror)
@@ -731,7 +744,7 @@ def needs_rebuild(spec, mirror_url, rebuild_on_errors=False):
     # just rebuild.  This can be simplified once the dag_hash and the
     # full_hash become the same thing.
     if ('full_hash' not in spec_yaml or
-        spec_yaml['full_hash'] != pkg_full_hash):
+            spec_yaml['full_hash'] != pkg_full_hash):
         if 'full_hash' in spec_yaml:
             reason = 'hash mismatch, remote = {0}, local = {1}'.format(
                 spec_yaml['full_hash'], pkg_full_hash)
@@ -795,7 +808,7 @@ def _download_buildcache_entry(mirror_root, descriptions):
     for description in descriptions:
         url = os.path.join(mirror_root, description['url'])
         path = description['path']
-        fail_if_missing = not description['required']
+        fail_if_missing = description['required']
 
         mkdirp(path)
 
@@ -803,7 +816,8 @@ def _download_buildcache_entry(mirror_root, descriptions):
 
         try:
             stage.fetch()
-        except fs.FetchError:
+        except fs.FetchError as e:
+            tty.debug(e)
             if fail_if_missing:
                 tty.error('Failed to download required url {0}'.format(url))
                 return False

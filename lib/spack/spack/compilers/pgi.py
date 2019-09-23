@@ -3,10 +3,11 @@
 #
 # SPDX-License-Identifier: (Apache-2.0 OR MIT)
 
-import spack.compiler
+from spack.compiler import Compiler, UnsupportedCompilerFlag
+from spack.version import ver
 
 
-class Pgi(spack.compiler.Compiler):
+class Pgi(Compiler):
     # Subclasses use possible names of C compiler
     cc_names = ['pgcc']
 
@@ -18,10 +19,6 @@ class Pgi(spack.compiler.Compiler):
 
     # Subclasses use possible names of Fortran 90 compiler
     fc_names = ['pgfortran', 'pgf95', 'pgf90']
-
-    # LLVM-enabled PGI compilers add a '-llvm' suffix:
-    #   pgcc-llvm, pgc++llvm, pgfortran-llvm
-    suffixes = ['-?llvm']
 
     # Named wrapper links within build_env_path
     link_paths = {'cc': 'pgi/pgcc',
@@ -35,6 +32,10 @@ class Pgi(spack.compiler.Compiler):
     version_argument = '-V'
     version_regex = r'pg[^ ]* ([0-9.]+)-[0-9]+ (LLVM )?[^ ]+ target on '
 
+    @classmethod
+    def verbose_flag(cls):
+        return "-v"
+
     @property
     def openmp_flag(self):
         return "-mp"
@@ -46,3 +47,23 @@ class Pgi(spack.compiler.Compiler):
     @property
     def pic_flag(self):
         return "-fpic"
+
+    required_libs = ['libpgc', 'libpgf90']
+
+    @property
+    def c99_flag(self):
+        if self.version >= ver('12.10'):
+            return '-c99'
+        raise UnsupportedCompilerFlag(self,
+                                      'the C99 standard',
+                                      'c99_flag',
+                                      '< 12.10')
+
+    @property
+    def c11_flag(self):
+        if self.version >= ver('15.3'):
+            return '-c11'
+        raise UnsupportedCompilerFlag(self,
+                                      'the C11 standard',
+                                      'c11_flag',
+                                      '< 15.3')

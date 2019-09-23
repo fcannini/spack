@@ -17,7 +17,7 @@ class Singularity(MakefilePackage):
        which has a different install base (Autotools).
 
        Needs post-install chmod/chown steps to enable full functionality.
-       See package definition for details.
+       See package definition or `spack-build-out.txt` build log for details.
     '''
 
     homepage = "https://www.sylabs.io/singularity/"
@@ -25,6 +25,10 @@ class Singularity(MakefilePackage):
     git      = "https://github.com/sylabs/singularity.git"
 
     version('develop', branch='master')
+
+    version('3.4.0', sha256='eafb27f1ffbed427922ebe2b5b95d1c9c09bfeb897518867444fe230e3e35e41')
+    version('3.3.0', sha256='070530a472e7e78492f1f142c8d4b77c64de4626c4973b0589f0d18e1fcf5b4f')
+    version('3.2.1', sha256='d4388fb5f7e0083f0c344354c9ad3b5b823e2f3f27980e56efa7785140c9b616')
     version('3.1.1', '158f58a79db5337e1d655ee0159b641e42ea7435')
 
     depends_on('go')
@@ -32,13 +36,17 @@ class Singularity(MakefilePackage):
     depends_on('libgpg-error')
     depends_on('squashfs', type='run')
     depends_on('git', when='@develop')  # mconfig uses it for version info
+    depends_on('shadow', type='run', when='@3.3:')
+    depends_on('cryptsetup', type=('build', 'run'), when='@3.4:')
+
+    patch('singularity_v3.4.0_remove_root_check.patch', level=0, when='@3.4.0')
 
     # Go has novel ideas about how projects should be organized.
     # We'll point GOPATH at the stage dir, and move the unpacked src
     # tree into the proper subdir in our overridden do_stage below.
     @property
     def gopath(self):
-        return join_path(self.stage.path)
+        return self.stage.path
 
     @property
     def sylabs_gopath_dir(self):
@@ -52,13 +60,15 @@ class Singularity(MakefilePackage):
     # its home within GOPATH.
     def do_stage(self, mirror_only=False):
         super(Singularity, self).do_stage(mirror_only)
-        source_path = self.stage.source_path
         if not os.path.exists(self.singularity_gopath_dir):
+            # Move the expanded source to its destination
             tty.debug("Moving {0} to {1}".format(
-                source_path, self.singularity_gopath_dir))
-            mkdirp(self.sylabs_gopath_dir)
-            shutil.move(source_path,
-                        self.singularity_gopath_dir)
+                self.stage.source_path, self.singularity_gopath_dir))
+            shutil.move(self.stage.source_path, self.singularity_gopath_dir)
+
+            # The build process still needs access to the source path,
+            # so create a symlink.
+            force_symlink(self.singularity_gopath_dir, self.stage.source_path)
 
     # MakefilePackage's stages use this via working_dir()
     @property
@@ -133,7 +143,9 @@ class Singularity(MakefilePackage):
         tty.warn("""
         For full functionality, you'll need to chown and chmod some files
         after installing the package.  This has security implications.
-        See: https://singularity.lbl.gov/docs-security for details.
+        For details, see:
+        https://sylabs.io/guides/2.6/admin-guide/security.html
+        https://sylabs.io/guides/3.2/admin-guide/admin_quickstart.html#singularity-security
 
         We've installed a script that will make the necessary changes;
         read through it and then execute it as root (e.g. via sudo).
