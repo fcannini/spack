@@ -18,6 +18,8 @@ class Openblas(MakefilePackage):
     git      = 'https://github.com/xianyi/OpenBLAS.git'
 
     version('develop', branch='develop')
+    version('0.3.7', sha256='bde136122cef3dd6efe2de1c6f65c10955bbb0cc01a520c2342f5287c28f9379')
+    version('0.3.6', sha256='e64c8fe083832ffbc1459ab6c72f71d53afd3b36e8497c922a15a06b72e9002f')
     version('0.3.5', sha256='0950c14bd77c90a6427e26210d6dab422271bc86f9fc69126725833ecdaa0e85')
     version('0.3.4', sha256='4b4b4453251e9edb5f57465bf2b3cf67b19d811d50c8588cdf2ea1f201bb834f')
     version('0.3.3', sha256='49d88f4494ae780e3d7fa51769c00d982d7cdb73e696054ac3baa81d42f13bab')
@@ -98,6 +100,19 @@ class Openblas(MakefilePackage):
           sha256='f1b066a4481a50678caeb7656bf3e6764f45619686ac465f257c8017a2dc1ff0',
           when='@0.3.0:0.3.3')
 
+    # The two patches below fix building with PGI 19.4 (issues 2223 and 2240)
+    patch('https://github.com/xianyi/OpenBLAS/commit/a95a5e52b8df842f0ec23c6d0ad9b299c1318ab4.patch',
+          sha256='9ea7a2c344bb70ec107510c8a682d29983f54e2211be1f1b8d8a9f14ac34fb80',
+          when='@0.3.7 %pgi@19.4')
+
+    patch('https://github.com/xianyi/OpenBLAS/commit/e3d846ab57eabadf5b933e8ca66d0b2c62e23e4c.patch',
+          sha256='d8794ebd6f86e37acabf8d4b2462e062ee60d340292af8d10f439f79b07c61a2',
+          when='@0.3.7 %pgi@19.4')
+
+    patch('https://github.com/xianyi/OpenBLAS/commit/7d380f7d79abe1a8d7ed6efd56efe677135c2415.patch',
+          sha256='ad9af8b78caf8ddaa071f864c8b0491c4393835b5eb7d1176e958cfe6c38f51a',
+          when='@0.3.7 %pgi@19.4')
+
     conflicts('%intel@16', when='@0.2.15:0.2.19')
 
     @property
@@ -154,7 +169,7 @@ class Openblas(MakefilePackage):
             ]
 
         if self.spec.variants['cpu_target'].value == 'DYNAMIC':
-            make_defs += ['DYNAMIC_ARCH=1']
+            make_defs += ['DYNAMIC_ARCH=1',]
         elif self.spec.variants['cpu_target'].value != 'auto':
             make_defs += [
                 'TARGET={0}'.format(self.spec.variants['cpu_target'].value)
@@ -175,6 +190,9 @@ class Openblas(MakefilePackage):
                     'FFLAGS={0}'.format(self.compiler.pic_flag)
                 ])
             make_defs += ['NO_SHARED=1']
+
+#       if self.spec.satisfies('%pgi'):
+#           make_defs += ['FCOMMON_OPT += -m64 -Mnollvm']
 
         # fix missing _dggsvd_ and _sggsvd_
         if self.spec.satisfies('@0.2.16'):
