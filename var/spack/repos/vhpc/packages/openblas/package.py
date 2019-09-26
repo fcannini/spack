@@ -100,7 +100,7 @@ class Openblas(MakefilePackage):
           sha256='f1b066a4481a50678caeb7656bf3e6764f45619686ac465f257c8017a2dc1ff0',
           when='@0.3.0:0.3.3')
 
-    # The two patches below fix building with PGI 19.4 (issues 2223 and 2240)
+    # The patches below fix building with PGI 19.4 (issues 2223 and 2240)
     patch('https://github.com/xianyi/OpenBLAS/commit/a95a5e52b8df842f0ec23c6d0ad9b299c1318ab4.patch',
           sha256='9ea7a2c344bb70ec107510c8a682d29983f54e2211be1f1b8d8a9f14ac34fb80',
           when='@0.3.7 %pgi@19.4')
@@ -169,7 +169,7 @@ class Openblas(MakefilePackage):
             ]
 
         if self.spec.variants['cpu_target'].value == 'DYNAMIC':
-            make_defs += ['DYNAMIC_ARCH=1',]
+            make_defs += ['DYNAMIC_ARCH=1']
         elif self.spec.variants['cpu_target'].value != 'auto':
             make_defs += [
                 'TARGET={0}'.format(self.spec.variants['cpu_target'].value)
@@ -190,9 +190,6 @@ class Openblas(MakefilePackage):
                     'FFLAGS={0}'.format(self.compiler.pic_flag)
                 ])
             make_defs += ['NO_SHARED=1']
-
-#       if self.spec.satisfies('%pgi'):
-#           make_defs += ['FCOMMON_OPT += -m64 -Mnollvm']
 
         # fix missing _dggsvd_ and _sggsvd_
         if self.spec.satisfies('@0.2.16'):
