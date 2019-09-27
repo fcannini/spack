@@ -1,0 +1,56 @@
+--- a/src/geometry/CreateGeom2DPetsc.F90	2019-09-26 17:49:00.267000000 -0300
++++ b/src/geometry/CreateGeom2DPetsc.F90	2019-09-26 17:52:39.715000000 -0300
+@@ -12,10 +12,10 @@
+ !!!
+ !!! ====================================================================
+ #define PETSC_USE_FORTRAN_MODULES 1
+-#include "finclude/petscsysdef.h"
+-#include "finclude/petscvecdef.h"
+-#include "finclude/petscdmdef.h"
+-#include "finclude/petscviewerdef.h"
++#include "petsc/finclude/petscsysdef.h"
++#include "petsc/finclude/petscvecdef.h"
++#include "petsc/finclude/petscdmdef.h"
++#include "petsc/finclude/petscviewerdef.h"
+ 
+ program geometry
+   use petsc
+@@ -46,8 +46,8 @@
+   call PetscOptionsGetInt(PETSC_NULL_CHARACTER,'-ny',NY,flag,ierr)
+   if (.not.flag) NY=65
+ 
+-  call DMDACreate2d(PETSC_COMM_SELF, DMDA_BOUNDARY_NONE, &
+-       DMDA_BOUNDARY_NONE, DMDA_STENCIL_BOX, &
++  call DMDACreate2d(PETSC_COMM_SELF, DM_BOUNDARY_NONE, &
++       DM_BOUNDARY_NONE, DMDA_STENCIL_BOX, &
+        NX, NY, PETSC_DECIDE, PETSC_DECIDE, 1, 0, &
+        PETSC_NULL_INTEGER, PETSC_NULL_INTEGER, da, ierr)
+   call DMSetFromOptions(da, ierr)
+--- a/src/geometry/CreateGeom3DPetsc.F90	2019-09-26 17:50:14.281000000 -0300
++++ b/src/geometry/CreateGeom3DPetsc.F90	2019-09-26 17:52:50.332000000 -0300
+@@ -12,10 +12,10 @@
+ !!!
+ !!! ====================================================================
+ #define PETSC_USE_FORTRAN_MODULES 1
+-#include "finclude/petscsysdef.h"
+-#include "finclude/petscvecdef.h"
+-#include "finclude/petscdmdef.h"
+-#include "finclude/petscviewerdef.h"
++#include "petsc/finclude/petscsysdef.h"
++#include "petsc/finclude/petscvecdef.h"
++#include "petsc/finclude/petscdmdef.h"
++#include "petsc/finclude/petscviewerdef.h"
+ 
+ program geometry
+   use petsc
+@@ -49,8 +49,8 @@
+   if (.not.flag)   NZ=200 !default values, may be altered
+ 
+ 
+-  call DMDACreate3d(PETSC_COMM_SELF, DMDA_BOUNDARY_NONE, &
+-       DMDA_BOUNDARY_NONE, DMDA_BOUNDARY_NONE, DMDA_STENCIL_BOX, &
++  call DMDACreate3d(PETSC_COMM_SELF, DM_BOUNDARY_NONE, &
++       DM_BOUNDARY_NONE, DM_BOUNDARY_NONE, DMDA_STENCIL_BOX, &
+        NX, NY, NZ, PETSC_DECIDE, PETSC_DECIDE, PETSC_DECIDE, 1, 0, &
+        PETSC_NULL_INTEGER, PETSC_NULL_INTEGER, PETSC_NULL_INTEGER, da, ierr)
+   call DMSetFromOptions(da, ierr)
