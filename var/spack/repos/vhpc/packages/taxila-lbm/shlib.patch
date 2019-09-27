@@ -1,0 +1,28 @@
+--- a/src/lbm/Makefile	2019-09-26 19:32:06.037000000 -0300
++++ b/src/lbm/Makefile	2019-09-26 21:03:36.116000000 -0300
+@@ -19,7 +19,7 @@
+ LBM_MOD_DIR= $(LBM_LIB_DIR)/modules
+ LBM_LIB_NAME= lbm.a
+ 
+-FFLAGS += -I$(LBM_INCLUDE_DIR) 
++FFLAGS += -I$(LBM_INCLUDE_DIR) -fPIC
+ 
+ # module location
+ ifeq ($(COMP),gfortran)  # gnu compiler
+@@ -53,6 +53,8 @@
+   FFLAGS += -O3
+ endif
+ 
++RPATHDIRS = $(shell echo $(LD_LIBRARY_PATH) | sed 's@:@\n@g' | sort -ur | sed 's@^@-Wl,-rpath,@g') 
++
+ ifndef AR
+   AR = ar
+ endif
+@@ -91,6 +93,7 @@
+ fortran: BEGINLIB library
+ 
+ library: BEGINLIB utils $(foreach obj, $(MODULES), $(LBM_LIB_DIR)/$(LBM_LIB_NAME)($(obj)))
++	mpif90 -shared $(RPATHDIRS) -Wl,-soname=liblbm.so -o $(LBM_LIB_DIR)/liblbm.so $(MODULES)
+ BEGINLIB:
+ 	@echo "building lbm objects and library $(LBM_LIB_NAME) ... "
+ 	@echo " with compiler family $(COMP)"
