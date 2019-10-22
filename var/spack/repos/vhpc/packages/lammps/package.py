@@ -48,8 +48,8 @@ class Lammps(CMakePackage):
                           'manybody', 'mc', 'meam', 'misc', 'molecule',
                           'mpiio', 'peri', 'poems', 'python', 'qeq', 'reax',
                           'replica', 'rigid', 'shock', 'snap', 'srd',
-                          'user-atc', 'user-h5md', 'user-lb', 'user-misc',
-                          'user-netcdf', 'user-omp', 'voronoi']
+                          'user-atc', 'user-colvars', 'user-h5md', 'user-lb',
+			  'user-misc', 'user-netcdf', 'user-omp', 'voronoi']
 
     for pkg in supported_packages:
         variant(pkg, default=False,
