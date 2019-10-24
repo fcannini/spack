@@ -52,27 +52,42 @@ class Lammps(CMakePackage):
             vdate.strftime("%d%b%Y").lstrip('0'))
 
     supported_packages = ['asphere', 'body', 'class2', 'colloid',
-                          'compress', 'coreshell', 'dipole', 'granular',
-                          'kspace', 'latte', 'manybody', 'mc', 'meam',
-                          'misc', 'molecule', 'mpiio', 'peri', 'poems',
-                          'python', 'qeq', 'reax', 'replica', 'rigid',
-                          'shock', 'snap', 'srd', 'user-atc', 'user-colvars',
-                          'user-h5md', 'user-lb', 'user-misc', 'user-netcdf',
-                          'user-omp', 'user-plumed', 'voronoi']
+                          'compress', 'coreshell', 'dipole', 'gpu',
+                          'granular', 'kspace', 'latte', 'manybody', 'mc',
+                          'meam', 'misc', 'molecule', 'mpiio', 'peri',
+                          'poems', 'python', 'qeq', 'reax', 'replica',
+                          'rigid', 'shock', 'snap', 'srd', 'user-atc',
+                          'user-colvars', 'user-h5md', 'user-lb', 'user-misc',
+                          'user-netcdf', 'user-omp', 'user-plumed', 'voronoi']
 
     for pkg in supported_packages:
         variant(pkg, default=False,
                 description='Activate the {0} package'.format(pkg))
+
     variant('lib', default=True,
             description='Build the liblammps in addition to the executable')
+
     variant('mpi', default=True,
             description='Build with mpi')
 
-    variant('cuda', default=False,
-            description='Build LAMMPS with cuda support')
-
     variant('plumed', default=False,
             description='Build LAMMPS with plumed support')
+
+    variant('gpuprec', default='mixed', multi=False,
+            values=('single', 'double', 'mixed'),
+            description='GPU package math precision')
+
+    variant('gpuarch', default='sm_30', multi=False,
+            values=('sm_30', 'sm_35', 'sm_37',
+                    'sm_50', 'sm_52', 'sm_60',
+                    'sm_61', 'sm_70', 'sm_75'),
+            description='Nvidia arch to build when using GPU package')
+
+    variant('cupp', default='yes', multi=False, values=('no', 'yes'),
+            description='Use CUDA Performance Primitives')
+
+    variant('cudanps', default='no', multi=False, values=('no', 'yes'),
+            description='Enables use of nvidia-cuda-mps daemon')
 
     depends_on('mpi', when='+mpi')
     depends_on('mpi', when='+mpiio')
@@ -90,8 +105,10 @@ class Lammps(CMakePackage):
     depends_on('mpi', when='+user-lb')
     depends_on('mpi', when='+user-h5md')
     depends_on('hdf5', when='+user-h5md')
-    depends_on('cuda', when='+cuda')
+    depends_on('cuda', when='+gpu')
     depends_on('plumed', when='+plumed')
+    depends_on('blas', when='+plumed')
+    depends_on('lapack', when='+plumed')
 
     conflicts('+body', when='+poems@:20180628')
     conflicts('+latte', when='@:20170921')
@@ -138,13 +155,16 @@ class Lammps(CMakePackage):
         if '+kspace' in spec:
             args.append('-DFFT=FFTW3')
 
-        if '+cuda' in spec:
-            args.append('-D{0}_GPU={1}'.format(pkg_prefix, 'ON'))
-            args.append('-DGPU_API=cuda')
-        else:
-            args.append('-D{0}_GPU={1}'.format(pkg_prefix, 'OFF'))
-
         if '+plumed' in spec:
             args.extend(['-DDOWNLOAD_PLUMED=OFF', '-DPLUMED_MODE=shared'])
+
+    	if '+gpu' in spec:
+            args.extend([
+                '-DGPU_API=cuda',
+                '-DGPU_PREC={0}'.format(spec.variants['gpuprec'].value),
+                '-DGPU_ARCH={0}'.format(spec.variants['gpuarch'].value),
+                '-DCUDPP_OPT={0}'.format(spec.variants['cupp'].value),
+                '-DCUDA_MPS_SUPPORT={0}'.format(spec.variants['cudanps'].value)
+                ])
 
         return args
