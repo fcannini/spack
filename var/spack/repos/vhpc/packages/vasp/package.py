@@ -20,8 +20,19 @@ class Vasp(MakefilePackage):
 
     version('5.4.4', sha256='5bd2449462386f01e575f9adf629c08cb03a13142806ffb6a71309ca4431cfb3') # noqa
 
+    resource(name='vaspsol',
+             url='https://raw.githubusercontent.com/henniggroup/VASPsol/V1.0/src/solvation.F',
+             sha256='825b90e0a97ae9aec7e787bf1c6f2b9e397150f04f517322ba1a0e8232587331',
+             expand=False,
+             destination='src',
+             when='+vaspsol'
+            )
+
     variant('cuda', default=False,
             description='Enables running on Nvidia GPUs')
+
+    variant('vaspsol', default=False,
+            description='Enable VASPsol implicit solvation model')
 
     depends_on('blas')
     depends_on('lapack')
@@ -86,6 +97,9 @@ class Vasp(MakefilePackage):
                                                       -openmp \
                                                       -DGPUSHMEM=300 \
                                                       -DHAVE_CUBLAS')
+
+#        if '+vaspsol' in spec:
+#            os.rename('VASPsol/src/solvation.F', 'src/solvation.F')
 
 
     def build(self, spec, prefix):
