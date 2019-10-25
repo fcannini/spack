@@ -20,13 +20,18 @@ class Vasp(MakefilePackage):
 
     version('5.4.4', sha256='5bd2449462386f01e575f9adf629c08cb03a13142806ffb6a71309ca4431cfb3') # noqa
 
+    variant('cuda', default=False,
+            description='Enables running on Nvidia GPUs')
+
     depends_on('blas')
     depends_on('lapack')
     depends_on('fftw')
     depends_on('mpi')
     depends_on('netlib-scalapack')
+    depends_on('cuda', when='+cuda')
 
     parallel = False
+
 
     def edit(self, spec, prefix):
         spec = self.spec
@@ -57,9 +62,39 @@ class Vasp(MakefilePackage):
         make_include.filter('^SCALAPACK[ ]+=.*$', 'SCALAPACK\t= '
                             + spec['netlib-scalapack'].libs.ld_flags)
 
+        if '+cuda' in spec:
+            os.environ['CUDA_ROOT'] = spec['cuda'].prefix
+            os.environ['GENCODE_ARCH'] = '-gencode=arch=compute_30,code=\"sm_30,compute_30\"'
+
+            make_include.filter('^OBJECTS_GPU[ ]{0,}=.*$', 'OBJECTS_GPU = \
+                                                            fftmpiw.o \
+                                                            fftmpi_map.o \
+                                                            fft3dlib.o \
+                                                            fftw3d_gpu.o \
+                                                            fftmpiw_gpu.o')
+
+            make_include.filter('^CPP_GPU[ ]{0,}=.*$', 'CPP_GPU = \
+                                                        -DCUDA_GPU \
+                                                        -DRPROMU_CPROJ_OVERLAP \
+                                                        -DCUFFT_MIN=28 \
+                                                        -UscaLAPACK \
+                                                        -DUSE_PINNED_MEMORY')
+
+            make_include.filter('^CFLAGS[ ]{0,}=.*$', 'CFLAGS = \
+                                                      -fPIC \
+                                                      -DADD_ \
+                                                      -openmp \
+                                                      -DGPUSHMEM=300 \
+                                                      -DHAVE_CUBLAS')
+
+
     def build(self, spec, prefix):
-        make()
+        if '+cuda' in self.spec:
+            make('gpu', 'gpu_ncl')
+        else:
+            make()
+
 
     def install(self, spec, prefix):
-        mkdirp(self.prefix.bin)
-        install_tree('bin/', self.prefix.bin)
+        mkdirp(prefix.bin)
+        install_tree('bin/', prefix.bin)
