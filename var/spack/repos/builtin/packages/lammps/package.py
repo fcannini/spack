@@ -21,7 +21,13 @@ class Lammps(CMakePackage):
     tags = ['ecp', 'ecp-apps']
 
     version('develop', branch='master')
+    version('20190919', sha256='0f693203afe86bc70c084c55f29330bdeea3e3ad6791f81c727f7a34a7f6caf3')
     version('20190807', sha256='895d71914057e070fdf0ae5ccf9d6552b932355056690bdb8e86d96549218cc0')
+    version('20190806', sha256='3c05615e6d1462e260515aa5a5d8ad624f213fb7119f97f40b67a9ed5cc7b6c0')
+    version('20190802', sha256='fd5c23cd0a372a195016754128f5a06cb7a576522b495acb21e9f05539ad8fe2')
+    version('20190731', sha256='d323da6930a76b3fd9482022eeabd25a06fe5ffc88c9f4cf1cb52104f3a9ac13')
+    version('20190719', sha256='12f0b21c9c1c8a5a34fa6126a4cc5157e1c97c28b05b67385d38784a42e227ae')
+    version('20190618', sha256='8ff6ee4b8ba62d7f6246b9271e2700d4a443e209df9dc891c4068ada173d509c')
     version('20190605', sha256='c7b35090aef7b114d2b47a7298c1e8237dd811da87995c997bf7639cca743152')
     version('20181212', sha256='ccc5d2c21c4b62ce4afe7b3a0fe2f37b83e5a5e43819b7c2e2e255cce2ce0f24')
     version('20181207', sha256='d92104d008a7f1d0b6071011decc5c6dc8b936a3418b20bd34b055371302557f')
@@ -45,30 +51,43 @@ class Lammps(CMakePackage):
         return "https://github.com/lammps/lammps/archive/patch_{0}.tar.gz".format(
             vdate.strftime("%d%b%Y").lstrip('0'))
 
-    supported_packages = ['asphere', 'body', 'class2', 'colloid', 'compress',
-                          'coreshell', 'dipole', 'granular', 'kspace', 'latte',
-                          'manybody', 'mc', 'meam', 'misc', 'molecule',
-                          'mpiio', 'peri', 'poems', 'python', 'qeq', 'reax',
-                          'replica', 'rigid', 'shock', 'snap', 'srd',
-                          'user-atc', 'user-h5md', 'user-lb', 'user-misc',
-                          'user-netcdf', 'user-omp', 'voronoi']
+    supported_packages = ['asphere', 'body', 'class2', 'colloid',
+                          'compress', 'coreshell', 'dipole', 'gpu',
+                          'granular', 'kspace', 'latte', 'manybody', 'mc',
+                          'meam', 'misc', 'molecule', 'mpiio', 'peri',
+                          'poems', 'python', 'qeq', 'reax', 'replica',
+                          'rigid', 'shock', 'snap', 'srd', 'user-atc',
+                          'user-colvars', 'user-h5md', 'user-lb', 'user-misc',
+                          'user-netcdf', 'user-omp', 'user-plumed', 'voronoi']
 
     for pkg in supported_packages:
         variant(pkg, default=False,
                 description='Activate the {0} package'.format(pkg))
+
     variant('lib', default=True,
             description='Build the liblammps in addition to the executable')
+
     variant('mpi', default=True,
             description='Build with mpi')
-    variant('jpeg', default=True,
-            description='Build with jpeg support')
-    variant('png', default=True,
-            description='Build with png support')
-    variant('ffmpeg', default=True,
-            description='Build with ffmpeg support')
-    variant('openmp', default=True, description='Build with OpenMP')
-    variant('exceptions', default=False,
-            description='Build with lammps exceptions')
+
+    variant('plumed', default=False,
+            description='Build LAMMPS with plumed support')
+
+    variant('gpuprec', default='mixed', multi=False,
+            values=('single', 'double', 'mixed'),
+            description='GPU package math precision')
+
+    variant('gpuarch', default='sm_30', multi=False,
+            values=('sm_30', 'sm_35', 'sm_37',
+                    'sm_50', 'sm_52', 'sm_60',
+                    'sm_61', 'sm_70', 'sm_75'),
+            description='Nvidia arch to build when using GPU package')
+
+    variant('cupp', default='yes', multi=False, values=('no', 'yes'),
+            description='Use CUDA Performance Primitives')
+
+    variant('cudanps', default='no', multi=False, values=('no', 'yes'),
+            description='Enables use of nvidia-cuda-mps daemon')
 
     depends_on('mpi', when='+mpi')
     depends_on('mpi', when='+mpiio')
@@ -86,9 +105,10 @@ class Lammps(CMakePackage):
     depends_on('mpi', when='+user-lb')
     depends_on('mpi', when='+user-h5md')
     depends_on('hdf5', when='+user-h5md')
-    depends_on('jpeg', when='+jpeg')
-    depends_on('libpng', when='+png')
-    depends_on('ffmpeg', when='+ffmpeg')
+    depends_on('cuda', when='+gpu')
+    depends_on('plumed', when='+plumed')
+    depends_on('blas', when='+plumed')
+    depends_on('lapack', when='+plumed')
 
     conflicts('+body', when='+poems@:20180628')
     conflicts('+latte', when='@:20170921')
@@ -98,7 +118,7 @@ class Lammps(CMakePackage):
     conflicts('+user-misc', when='~manybody')
     conflicts('+user-phonon', when='~kspace')
     conflicts('+user-misc', when='~manybody')
-    conflicts('%gcc@9:', when='+openmp')
+    conflicts('~user-plumed', when='+plumed')
 
     patch("lib.patch", when="@20170901")
     patch("660.patch", when="@20170922")
@@ -117,24 +137,13 @@ class Lammps(CMakePackage):
         args = [
             '-DBUILD_SHARED_LIBS={0}'.format(
                 'ON' if '+lib' in spec else 'OFF'),
-            '-DLAMMPS_EXCEPTIONS={0}'.format(
-                'ON' if '+exceptions' in spec else 'OFF'),
             '-D{0}_MPI={1}'.format(
                 mpi_prefix,
-                'ON' if '+mpi' in spec else 'OFF'),
-            '-DBUILD_OMP={0}'.format(
-                'ON' if '+openmp' in spec else 'OFF'),
+                'ON' if '+mpi' in spec else 'OFF')
         ]
 
         if spec.satisfies('@20180629:+lib'):
             args.append('-DBUILD_LIB=ON')
-
-        args.append('-DWITH_JPEG={0}'.format(
-            'ON' if '+jpeg' in spec else 'OFF'))
-        args.append('-DWITH_PNG={0}'.format(
-            'ON' if '+png' in spec else 'OFF'))
-        args.append('-DWITH_FFMPEG={0}'.format(
-            'ON' if '+ffmpeg' in spec else 'OFF'))
 
         for pkg in self.supported_packages:
             opt = '-D{0}_{1}'.format(pkg_prefix, pkg.upper())
@@ -144,5 +153,17 @@ class Lammps(CMakePackage):
                 args.append('{0}=OFF'.format(opt))
         if '+kspace' in spec:
             args.append('-DFFT=FFTW3')
+
+        if '+plumed' in spec:
+            args.extend(['-DDOWNLOAD_PLUMED=OFF', '-DPLUMED_MODE=shared'])
+
+        if '+gpu' in spec:
+            args.extend([
+                '-DGPU_API=cuda',
+                '-DGPU_PREC={0}'.format(spec.variants['gpuprec'].value),
+                '-DGPU_ARCH={0}'.format(spec.variants['gpuarch'].value),
+                '-DCUDPP_OPT={0}'.format(spec.variants['cupp'].value),
+                '-DCUDA_MPS_SUPPORT={0}'.format(spec.variants['cudanps'].value)
+            ])
 
         return args
