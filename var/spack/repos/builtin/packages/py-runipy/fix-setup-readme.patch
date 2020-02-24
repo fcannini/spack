@@ -1,0 +1,19 @@
+--- a/setup.py	2019-06-14 23:01:47.761000000 -0300
++++ b/setup.py	2019-06-14 23:02:02.534000000 -0300
+@@ -24,16 +24,11 @@
+         'nbformat>=4.0.0',
+     ])
+ 
+-readme = ""
+-with open("README.rst") as readme_file:
+-    readme = readme_file.read()
+-
+ setup(
+     name='runipy',
+     version=versioneer.get_version(),
+     license="BSD 2-Clause",
+     description='Run IPython notebooks from the command line',
+-    long_description=readme,
+     url='https://github.com/paulgb/runipy',
+     author='Paul Butler',
+     author_email='paulgb@gmail.com',

@@ -1,0 +1,13 @@
+--- a/wrappers/python/CMakeLists.txt	2019-06-06 18:25:14.014000000 -0300
++++ b/wrappers/python/CMakeLists.txt	2019-06-06 18:59:54.624000000 -0300
+@@ -274,8 +274,8 @@
+     COMMENT "Packaging source distribution package (sdist)..."
+ )
+ 
+-# Install binary module (to system location)
+-set(PYTHON_SETUP_COMMAND "install --root=\$ENV{DESTDIR}/")
++# Install binary module to OpenMM 'lib/python#.#/site-packages' dir
++set(PYTHON_SETUP_COMMAND "install --prefix=${CMAKE_INSTALL_PREFIX}")
+ configure_file(pysetup.cmake.in
+     "${CMAKE_CURRENT_BINARY_DIR}/pysetupinstall.cmake" @ONLY)
+ add_custom_target(PythonInstall
