@@ -64,7 +64,7 @@ class Lammps(CMakePackage, CudaPackage):
                           'qeq', 'replica', 'rigid', 'shock', 'snap', 'spin',
                           'srd', 'user-atc', 'user-h5md', 'user-lb',
                           'user-meamc', 'user-misc', 'user-netcdf', 'user-omp',
-                          'user-reaxc', 'voronoi']
+                          'user-plumed', 'user-reaxc', 'voronoi']
 
     for pkg in supported_packages:
         variant(pkg, default=False,
@@ -111,6 +111,7 @@ class Lammps(CMakePackage, CudaPackage):
     depends_on('ffmpeg', when='+ffmpeg')
     depends_on('kokkos+deprecated_code+shared@3.0', when='@20200303+kokkos')
     depends_on('kokkos+shared@3.1:', when='@20200505:+kokkos')
+    depends_on('plumed', when='+user-plumed')
 
     conflicts('+cuda', when='+opencl')
     conflicts('+body', when='+poems@:20180628')
@@ -188,6 +189,9 @@ class Lammps(CMakePackage, CudaPackage):
                 args.append('-DFFT=MKL')
         if '+kokkos' in spec:
             args.append('-DEXTERNAL_KOKKOS=ON')
+
+        if '+user-plumed' in spec:
+            args.extend(['-DDOWNLOAD_PLUMED=OFF', '-DPLUMED_MODE=shared'])
 
         return args
 
